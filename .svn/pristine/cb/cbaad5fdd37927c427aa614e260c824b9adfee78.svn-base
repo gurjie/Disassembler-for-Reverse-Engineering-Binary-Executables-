@@ -1,0 +1,169 @@
+package first;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+import elf.SectionHeader;
+
+public class SymbolEntry1 {
+	private byte[] symboltab;
+	private byte[] nameOffsetBytes = new byte[4];
+	private byte[] valueBytes = new byte[8];
+	private byte[] strtab;
+	private byte[] sizeBytes = new byte[8];
+	private String symbol_name;
+	
+	private int binding_attributes;
+	private int symbolType;
+	private String type;
+	private int other;
+	private int nameOffset;
+	private long value;
+	private long fileOffset;
+	private long size;
+	
+	public SymbolEntry1(byte[] symboltab_bytes, byte[] strtab_bytes) {
+		this.symboltab = symboltab_bytes;
+		this.strtab = strtab_bytes;
+		setNameOffset();
+		setInfo();
+		setOther();
+		setValue();
+		setFileOffset();
+		setSize();
+	}
+	
+	public String getSymbolName() {
+		return this.symbol_name;
+	}
+	
+	public String getSymbolType() {
+		return this.type;
+	}
+	
+	public void setSymbolTypeString() {
+		switch (this.symbolType) {
+			case 0: this.type = "STT_NOTYPE";
+					break;
+			case 1: this.type = "STT_OBJECT";
+					break;
+			case 2: this.type = "STT_FUNCT";
+					break;
+			case 3: this.type = "STT_SECTION";
+					break;
+			case 4: this.type = "STT_FILE";
+					break;
+			case 5: this.type = "STT_COMMON";
+					break;
+			case 6: this.type = "STT_TLS";
+					break;
+			case 10:this.type = "STT_LOOS";
+					break;
+			case 12: this.type = "STT_HIOS";
+					break;
+			case 13: this.type = "STT_LOPROC/SPARC_REG";
+					break;
+			case 15: this.type = "STT_NOTYPE";
+					break;
+		}
+	}
+	
+	public int getBindingAttributes() {
+		return this.binding_attributes;
+	}
+	
+	public int getOther() {
+		return this.other;
+	}
+	
+	public int getNameOffset() {
+		return this.nameOffset;
+	}
+	
+	// to verify its correctness
+	private void setNameOffset() {
+		for (int i = 0; i<4; i++) {
+			this.nameOffsetBytes[i] = this.symboltab[i];
+		}
+		
+	    ByteBuffer offset_bytes = ByteBuffer.wrap(this.nameOffsetBytes);
+	    offset_bytes.order(ByteOrder.LITTLE_ENDIAN); // or LITTLE_ENDIAN
+	    nameOffset = offset_bytes.getInt();
+	    byte start = 0;
+	    String name = "";
+	    while(this.strtab[this.nameOffset+start]!=0) {
+	        String strAsciiTab = Character.toString((char) this.strtab[this.nameOffset+start]);
+	        name = name.concat(strAsciiTab);
+	    	start++;
+	    }
+    	this.symbol_name = name;
+	}
+	
+	private void setInfo() {
+		int st_info = this.symboltab[4]&0xff;
+		this.binding_attributes = st_info>>4;
+		this.symbolType = st_info & 0x0f;
+		setSymbolTypeString();
+	}
+	
+	private void setOther() {
+		this.other = symboltab[5]&0xff;
+	}
+	
+	
+	// the below aren't really necessary, though implementation would be nice
+	
+	/*
+	private void setShndrx() {	
+		for (int i = 6; i<8; i++) {
+		System.out.println(i);
+		}
+	}*/
+	
+	private void setValue() {
+		int start = 0;
+		// value is 8 bytes into the symbol table, so start here
+		for(int i = 8; i<16; i++) {
+			this.valueBytes[i-8] = this.symboltab[i];
+		}
+	    ByteBuffer value_bytes = ByteBuffer.wrap(this.valueBytes);
+	    value_bytes.order(ByteOrder.LITTLE_ENDIAN); // or LITTLE_ENDIAN
+	    this.value = value_bytes.getLong();
+	}
+	
+	// return the offset into the symbol
+	public Long getValue() {
+		return this.value;
+	}
+	
+	private void setFileOffset() {
+		this.fileOffset = this.value-0x400000;
+	}
+	
+	public long getFileOffset() {
+		return this.fileOffset; 
+	}
+	
+	public long getSize() {
+		return this.size;
+	}
+	
+	
+	private void setSize() {
+		int start = 0; 
+		for(int i = 16; i<24; i++) {
+			this.sizeBytes[i-16] = this.symboltab[i];
+		}
+	    ByteBuffer size_bytes = ByteBuffer.wrap(this.sizeBytes);
+	    size_bytes.order(ByteOrder.LITTLE_ENDIAN); // or LITTLE_ENDIAN
+	    this.size = size_bytes.getLong();
+	}	
+	/*
+	private void setSize() {
+
+	}
+	*/
+	
+	
+	
+}

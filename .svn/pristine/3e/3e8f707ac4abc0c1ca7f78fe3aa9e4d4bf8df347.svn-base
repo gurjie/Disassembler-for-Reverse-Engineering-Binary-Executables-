@@ -1,0 +1,120 @@
+package first;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Scanner;
+
+import capstone.Capstone;
+import elf.Elf;
+import elf.SectionHeader;
+
+
+public class first {
+	static String filePath;// /home/gurjan/sample
+	static byte[] text_bytes = null;
+	static byte[] symtab_bytes = null;
+	static byte[] slice_bytes;
+	static byte[] strtab_bytes;
+	static byte[] symbol_bytes;
+	static ArrayList<Long> symbol_addresses = new ArrayList<Long>();
+	static ArrayList<SymbolEntry1> symbol_entries = new ArrayList<SymbolEntry1>();
+
+    private static String array2hex(byte[] arr) {
+        String ret = "";
+        for (int i=0 ;i<arr.length; i++)
+            ret += String.format("0x%02x ", arr[i]);
+        return ret;
+    }
+    
+    private static SectionHeader getTextSection(Elf elf) {
+    	for(SectionHeader shrs : elf.sectionHeaders) {
+    		if(shrs.getName().equals(".text")) {
+    			return shrs;
+    		}
+    	}
+    	return elf.sectionHeaders[1];
+    }
+    
+    private static SectionHeader getStrTab(Elf elf) {
+    	for(SectionHeader shrs : elf.sectionHeaders) {
+    		if(shrs.getName().equals(".strtab")) {
+    			return shrs;
+    		}
+    	}
+    	return elf.sectionHeaders[1];
+    }
+    
+    
+    private static SectionHeader getSymbolTable(Elf elf) throws Exception {
+    	for(SectionHeader shrs : elf.sectionHeaders) {
+    		if(shrs.getName().equals(".symtab")) {
+    			return shrs;
+    		}
+    	}
+    	throw new Exception("FAILED TO RESOLVE THE SYMBOL TABLE: ELF MAY BE STRIPPED!");
+    }
+    
+	public static void main(String[] args) throws IOException {
+	    Path path = Paths.get("maze");
+		File f = new File("maze");
+	    byte[] data = Files.readAllBytes(path); //convert the executable to bytes
+		Elf elf = new Elf(f);
+		int entry = (int) (elf.header.entryPoint-0x400000);
+		SectionHeader symtab;
+		try {
+			
+			symtab = getSymbolTable(elf);
+			SectionHeader strtab = getStrTab(elf);
+			int symtab_size = (int) symtab.size;
+			int symtab_offset = (int) symtab.fileOffset;
+			int strtab_size = (int) strtab.size;
+			int strtab_offset = (int) strtab.fileOffset;
+			symtab_bytes = Arrays.copyOfRange(data, symtab_offset, symtab_offset+symtab_size);
+			strtab_bytes = Arrays.copyOfRange(data, strtab_offset, strtab_offset+strtab_size);
+			for(int i = 0; i<symtab_size; i+=24) {
+				slice_bytes = Arrays.copyOfRange(symtab_bytes, i, i+24);
+				SymbolEntry1 current = new SymbolEntry1(slice_bytes,strtab_bytes);
+				if(current.getSymbolName().equals("main")) {
+					System.out.println(i);
+				}
+				symbol_entries.add(current);
+				symbol_addresses.add(current.getValue());
+			}
+			text_bytes = Arrays.copyOfRange(data, entry, data.length-1);
+
+		
+			
+			Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
+			Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry+0x400000);	 		
+			for (int iv=0; iv<allInsn.length; iv++) {
+				if(symbol_addresses.contains(allInsn[iv].address)) {
+					for(SymbolEntry1 s:symbol_entries) {
+						if(allInsn[iv].address==s.getValue()) {
+							System.out.println("\n<"+s.getSymbolName()+">");
+							if(s.getSymbolName().equals("_start")) {
+								System.out.println("size: "+s.getSize()+
+										"  value:"+s.getValue()+" binding:"+s.getBindingAttributes()+
+										" STT_FUNCT "+ " ");
+							}
+						}
+					}
+				}
+			    System.out.printf("0x%x:\t%s\t%s\n", allInsn[iv].address, allInsn[iv].mnemonic, allInsn[iv].opStr);
+			}
+		} catch (Exception e1) {
+			text_bytes = Arrays.copyOfRange(data, entry, data.length-1);
+			e1.getMessage();
+			Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
+			Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry+0x400000);	 
+			for (int iv=0; iv<allInsn.length; iv++) {
+			    System.out.printf("0x%x:\t%s\t%s\n", allInsn[iv].address, allInsn[iv].mnemonic, allInsn[iv].opStr);
+			}
+		}
+		
+
+	}
+}
