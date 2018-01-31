@@ -1,0 +1,126 @@
+package first;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Scanner;
+
+import capstone.Capstone;
+import elf.Elf;
+import elf.SectionHeader;
+
+
+public class first {
+	static String filePath;// /home/gurjan/sample
+	static byte[] text_bytes = null;
+	static byte[] symtab_bytes = null;
+	static byte[] slice_bytes;
+	static byte[] strtab_bytes;
+	static byte[] symbol_bytes;
+	static byte[] function_bytes;
+	static ArrayList<SymbolEntry> symbol_entries = new ArrayList<SymbolEntry>();
+	
+    private static String array2hex(byte[] arr) {
+        String ret = "";
+        for (int i=0 ;i<arr.length; i++)
+            ret += String.format("0x%02x ", arr[i]);
+        return ret;
+    }
+    
+    private static SectionHeader getTextSection(Elf elf) {
+    	for(SectionHeader shrs : elf.sectionHeaders) {
+    		if(shrs.getName().equals(".text")) {
+    			return shrs;
+    		}
+    	}
+    	return elf.sectionHeaders[1];
+    }
+    
+    private static SectionHeader getStrTab(Elf elf) {
+    	for(SectionHeader shrs : elf.sectionHeaders) {
+    		if(shrs.getName().equals(".strtab")) {
+    			return shrs;
+    		}
+    	}
+    	return elf.sectionHeaders[1];
+    }
+    
+    
+    private static SectionHeader getSymbolTable(Elf elf) {
+    	for(SectionHeader shrs : elf.sectionHeaders) {
+    		if(shrs.getName().equals(".symtab")) {
+    			return shrs;
+    		}
+    	}
+    	return elf.sectionHeaders[1];
+    }
+    
+	public static void main(String[] args) throws IOException {
+		System.out.println("Specify a path to a valid ELF file to perform a linear sweep of:\n");
+		Scanner p = new Scanner(System.in);
+		filePath = p.nextLine();
+	    Path path = Paths.get(filePath);
+		File f = new File(filePath);
+		System.out.println("Valid function names for this file are as below:");
+	    byte[] data = Files.readAllBytes(path); //convert the executable to bytes
+		Elf elf = new Elf(f);
+		SectionHeader symtab = getSymbolTable(elf);
+		SectionHeader strtab = getStrTab(elf);
+		int symtab_size = (int) symtab.size;
+		int symtab_offset = (int) symtab.fileOffset;
+		int strtab_size = (int) strtab.size;
+		int strtab_offset = (int) strtab.fileOffset;
+		symtab_bytes = Arrays.copyOfRange(data, symtab_offset, symtab_offset+symtab_size);
+		strtab_bytes = Arrays.copyOfRange(data, strtab_offset, strtab_offset+strtab_size);
+		for(int i = 0; i<symtab_size; i+=24) {
+			slice_bytes = Arrays.copyOfRange(symtab_bytes, i, i+24);
+			SymbolEntry current = new SymbolEntry(slice_bytes,strtab_bytes);
+			symbol_entries.add(current);
+		}
+
+		int it = 0;
+		int main = 0;
+		int mainSize = 0;
+		for (SymbolEntry e : symbol_entries) {
+			if (e.getSymbolType().equals("STT_FUNCT")) {
+				System.out.print(e.getSymbolName() + "  ");
+			}
+			it++;
+		}
+
+		System.out.println("\n\nNow enter a function name from the above to disassemble."
+				+ "\nNOTE: the function must be within the file's scope. free@@GLIBC_2.2.5 for example can'be disassembled.");
+		Scanner fname = new Scanner(System.in);
+		String function = fname.nextLine();
+
+		
+		int i = 0;
+		int functionOffset = 0;
+		int functionSize = 0;
+		for (SymbolEntry e : symbol_entries) {
+			if(e.getSymbolType().equals("STT_FUNCT")) {
+				if (e.getSymbolName().equals(function)) {
+					functionOffset = (int) e.getFileOffset();
+					functionSize = (int) e.getSize();
+				}
+			}
+			i++;
+		}
+		
+		function_bytes = Arrays.copyOfRange(data, functionOffset, functionOffset+functionSize);
+
+	
+		
+		Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
+		Capstone.CsInsn[] allInsn = cs.disasm(function_bytes, functionOffset+0x400000);
+ 		System.out.println("<"+function+">");
+		for (int iv=0; iv<allInsn.length; iv++) {
+		    System.out.printf("0x%x:\t%s\t%s\n", allInsn[iv].address, allInsn[iv].mnemonic, allInsn[iv].opStr);
+		}
+		
+
+	}
+}

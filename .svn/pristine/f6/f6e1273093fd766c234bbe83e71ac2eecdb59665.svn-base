@@ -1,0 +1,39 @@
+package first;
+
+public class SymbolEntry {
+
+	private byte[] symtab_bytes;
+	private byte[] strtab_bytes;
+	public SymbolEntry(byte[] symtab_bytes, byte[] strtab_bytes) {
+		this.symtab_bytes = symtab_bytes;
+		this.strtab_bytes = strtab_bytes;
+		// TODO Auto-generated constructor stub
+	}
+
+	public int getSymTabSize() {
+		return this.symtab_bytes.length;
+		// TODO Auto-generated method stub
+		
+	}
+
+	public int getStrTabSize() {
+		// TODO Auto-generated method stub
+		return this.strtab_bytes.length;
+	}
+
+	public String getName() {
+		// TODO Auto-generated method stub
+		return "main";
+	}
+
+	public String getType() {
+		// TODO Auto-generated method stub
+		return "STT_FUNCT";
+	}
+
+	public long getAddress() {
+		// TODO Auto-generated method stub
+		return 4203639;
+	}
+
+}

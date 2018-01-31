@@ -1,0 +1,93 @@
+package first;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+public class SymbolEntry {
+
+	private byte[] symtab_bytes;
+	private byte[] strtab_bytes;
+	private byte[] sizeBytes = new byte[8];
+	private long size;
+	private byte[] valueBytes = new byte[8];
+	private long address;
+	private int bindingAttributes;
+	
+	public SymbolEntry(byte[] symtab_bytes, byte[] strtab_bytes) {
+		this.symtab_bytes = symtab_bytes;
+		this.strtab_bytes = strtab_bytes;
+		setSize();
+		setAddress();
+		setInfo();
+		// TODO Auto-generated constructor stub
+	}
+
+	public int getSymTabSize() {
+		return 2640;
+		// TODO Auto-generated method stub
+		
+	}
+
+	public int getStrTabSize() {
+		// TODO Auto-generated method stub
+		return this.strtab_bytes.length;
+	}
+
+	public String getName() {
+		// TODO Auto-generated method stub
+		return "main";
+	}
+
+	public String getType() {
+		// TODO Auto-generated method stub
+		return "STT_FUNCT";
+	}
+
+	public long getAddress() {
+		// TODO Auto-generated method stub
+		return this.address;
+	}
+
+	public int getOther() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public int getBindingAttributes() {
+		// TODO Auto-generated method stub
+		return this.bindingAttributes;
+	}
+
+	public int getSize() {
+		// TODO Auto-generated method stub
+		return (int) this.size;
+	}
+	
+	private void setAddress() {
+		int start = 0;
+		// value is 8 bytes into the symbol table, so start here
+		for(int i = 8; i<16; i++) {
+			this.valueBytes[i-8] = this.symtab_bytes[i];
+		}
+	    ByteBuffer value_bytes = ByteBuffer.wrap(this.valueBytes);
+	    value_bytes.order(ByteOrder.LITTLE_ENDIAN); // or LITTLE_ENDIAN
+	    this.address = value_bytes.getLong();
+	}
+	
+
+	private void setSize() {
+		for(int i = 16; i<24; i++) {
+			this.sizeBytes[i-16] = this.symtab_bytes[i];
+			System.out.println(this.symtab_bytes[i]);
+		}
+	    ByteBuffer size_bytes = ByteBuffer.wrap(this.sizeBytes);
+	    size_bytes.order(ByteOrder.LITTLE_ENDIAN); // or LITTLE_ENDIAN
+	    this.size = size_bytes.getLong();
+	}	
+	
+	private void setInfo() {
+		int st_info = this.symtab_bytes[4]&0xff;
+		this.bindingAttributes = st_info>>4;
+	}
+	
+}
