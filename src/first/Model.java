@@ -25,5 +25,9 @@ public class Model {
 	public void setLastname(String lastname) {
 		this.lastname = lastname;
 	}
+	
+	public void getCfg() {
+		
+	}
 
 }

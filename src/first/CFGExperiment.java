@@ -9,18 +9,23 @@ import javax.swing.JFrame;
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
 
-public class CFGExperiment extends JFrame
-{
+public class CFGExperiment {
 	
 	/**
 	 * 
 	 */
+	JFrame frame;
+
 	private static final long serialVersionUID = -2764911804288120883L;
 
+	public JFrame getFrame() {
+		return this.frame;
+	}
+	
+	
 	public CFGExperiment()
 	{
-		super("Hello, World!");
-		
+		frame = new JFrame("yo");
 		final mxGraph graph = new mxGraph();
 		Object parent = graph.getDefaultParent();
 
@@ -42,7 +47,7 @@ public class CFGExperiment extends JFrame
 		}
 		
 		final mxGraphComponent graphComponent = new mxGraphComponent(graph);
-		getContentPane().add(graphComponent);
+		frame.getContentPane().add(graphComponent);
 		
 		graphComponent.getGraphControl().addMouseListener(new MouseAdapter()
 		{
@@ -61,10 +66,10 @@ public class CFGExperiment extends JFrame
 
 	public static void main(String[] args)
 	{
-		CFGExperiment frame = new CFGExperiment();
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setSize(400, 320);
-		frame.setVisible(true);
+		CFGExperiment cfg = new CFGExperiment();
+		cfg.getFrame().setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		cfg.getFrame().setBounds(100,100,1261,808);
+		cfg.getFrame().setVisible(true);
 	}
 
 }

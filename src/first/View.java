@@ -36,6 +36,8 @@ public class View {
 	private JButton loadButton;
 	private JButton exportButton;
 	private JButton cfgButton;
+	private JButton zoomInButton;
+	private JButton zoomOutButton;
 	private JSplitPane encompassingPane;
 	private JSplitPane functionsPane;
 	private JPanel minigraphPanel;
@@ -65,6 +67,8 @@ public class View {
 		loadButton = new JButton("Load File");
 		exportButton = new JButton("Export");
 		cfgButton = new JButton("CFG");
+		zoomInButton = new JButton("Zoom In");
+		zoomOutButton = new JButton("Zoom Out");
 		encompassingPane = new JSplitPane();
 		functionsPane = new JSplitPane();
 		minigraphPanel = new JPanel();
@@ -140,6 +144,14 @@ public class View {
 
 	public JButton getCfgButton() {
 		return cfgButton;
+	}
+	
+	public JButton getZoomInButton() {
+		return zoomInButton;
+	}
+	
+	public JButton getZoomOutButton() {
+		return zoomOutButton;
 	}
 
 	public JSplitPane getEncompassingPane() {
