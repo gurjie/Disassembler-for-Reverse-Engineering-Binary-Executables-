@@ -221,6 +221,14 @@ public class View {
 	public void setFrame(JFrame frame) {
 		this.frame = frame;
 	}
+	
+	public void resetGraphPane() {
+		this.graphPane = new JPanel();
+	}
+	
+	public void resetGraphScrollPane() {
+		this.graphScrollPane = new JScrollPane();
+	}
 
 	/*
 	public JLabel getFirstnameLabel() {
