@@ -4,7 +4,12 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
+import java.io.IOException;
 
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
 
 import com.mxgraph.canvas.mxICanvas;
@@ -68,17 +73,19 @@ public class Controller {
 	}
 
 	public void initController() {
-		view.getLoadButton().addActionListener(e -> loadFile());
+		view.getLoadButton().addActionListener(e -> {
+			loadFile();
+		});
 		view.getExportButton().addActionListener(e -> export());
 		view.getCfgButton().addActionListener(e -> openCFG());
 		// view.getLastnameSaveButton().addActionListener(e -> saveLastname());
 		// view.getHello().addActionListener(e -> sayHello());
 		// view.getBye().addActionListener(e -> sayBye());
 	}
-	
+
 	public void initZoomListeners(mxGraphComponent graphComponent) {
 		view.getZoomInButton().addActionListener(e -> zoomIn(graphComponent));
-		view.getZoomOutButton().addActionListener(e-> zoomOut(graphComponent));
+		view.getZoomOutButton().addActionListener(e -> zoomOut(graphComponent));
 		// view.getLastnameSaveButton().addActionListener(e -> saveLastname());
 		// view.getHello().addActionListener(e -> sayHello());
 		// view.getBye().addActionListener(e -> sayBye());
@@ -89,8 +96,21 @@ public class Controller {
 	}
 
 	private void loadFile() {
-		System.out.println("Pressed");
-
+		JFileChooser fileChooser = new JFileChooser();
+		int returnValue = fileChooser.showOpenDialog(null);
+		if (returnValue == JFileChooser.APPROVE_OPTION) {
+			File selectedFile = fileChooser.getSelectedFile();
+			this.model.setFile(selectedFile);
+			try {
+				model.disassemble();
+			} catch (ReadException e) {
+				String message = e.getMessage();
+				JOptionPane.showMessageDialog(new JFrame(), message, "Exception", JOptionPane.ERROR_MESSAGE);
+			} catch (ElfException e) {
+				String message = e.getMessage();
+				JOptionPane.showMessageDialog(new JFrame(), message, "Exeption", JOptionPane.ERROR_MESSAGE);
+			}
+		}
 	}
 
 	private void export() {
@@ -161,8 +181,6 @@ public class Controller {
 			graph.insertEdge(parent, null, "", v18, v3);
 			graph.insertEdge(parent, null, "", v15, v11);
 
-			
-
 			graph.setCellsDisconnectable(false);
 			graph.setEdgeLabelsMovable(false);
 
@@ -171,21 +189,18 @@ public class Controller {
 			graph.getModel().endUpdate();
 		}
 		mxGraphComponent graphComponent = new mxGraphComponent(graph);
-		graphComponent.getGraphControl().addMouseListener(new MouseAdapter()
-		{
-			public void mouseReleased(MouseEvent e)
-			{
+		graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
+			public void mouseReleased(MouseEvent e) {
 				Object cell = graphComponent.getCellAt(e.getX(), e.getY());
-				if (cell != null)
-				{
-					
-					System.out.println("cell="+graph.getLabel(cell));
+				if (cell != null) {
+
+					System.out.println("cell=" + graph.getLabel(cell));
 				}
 			}
 		});
 		mxIGraphLayout layout = new mxHierarchicalLayout(graph);
 		layout.execute(graph.getDefaultParent());
-		//graph.groupCells();
+		// graph.groupCells();
 		graph.setCellsEditable(false);
 		graphComponent.setConnectable(false);
 		view.getGraphPane().setLayout(new BorderLayout());
@@ -198,7 +213,7 @@ public class Controller {
 		graphComponent.zoomIn();
 		graphComponent.validate();
 	}
-	
+
 	private void zoomOut(mxGraphComponent graphComponent) {
 		graphComponent.zoomOut();
 		graphComponent.validate();

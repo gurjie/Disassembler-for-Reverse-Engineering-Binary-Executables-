@@ -1,18 +1,24 @@
 package first;
 
+import java.io.File;
+import java.io.IOException;
+
 public class Model {
 
-	private String file;
+	private File file;
 	private int mode; 
 
 	// Instantiated upon file -> load or loading a file
-	public Model(String file, String mode) {
+	public Model() {
 
-		this.file = file;
 	}
 	
-	public void disassemble() {
-			
+	public void setFile(File f) {
+		this.file = f;
+	}
+	
+	public void disassemble() throws ReadException, ElfException {
+			Disasm instance = new Disasm(this.file);
 	}
 	
 }

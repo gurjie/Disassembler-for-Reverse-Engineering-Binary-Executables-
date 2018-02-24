@@ -107,9 +107,8 @@ public class single_disasm {
     }
     
 	public static void main(String[] args) throws Exception {
-	    Path path = Paths.get("maze");
 		File f = new File("maze");
-	    byte[] data = Files.readAllBytes(path); //convert the executable to bytes
+	    byte[] data = Files.readAllBytes(f.toPath()); //convert the executable to bytes
 		Elf elf = new Elf(f);
 		int entry = (int) (elf.header.entryPoint-0x400000);
 		SectionHeader symtab;
