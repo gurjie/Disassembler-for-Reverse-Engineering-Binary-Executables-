@@ -151,37 +151,15 @@ public class single_disasm {
 			dynstr_bytes = Arrays.copyOfRange(data, dynstr_offset, dynstr_offset+dynstr_size);
 			text_bytes = Arrays.copyOfRange(data, entry, (int) (entry+textSize));
 			long address = reloc_offset;
-			//printSections(elf);
-			/*
-			for(int i = 0; i<reloc_size; i+=relEntrySize) {
-				slice_bytes = Arrays.copyOfRange(rela_plt_bytes, i, i+relEntrySize);
-				RelocEntry current = new RelocEntry(slice_bytes,dynsym_bytes,dynstr_bytes);
-				System.out.print(current.name+"\t");
-				System.out.println(current.getIndex());
-				address+=relEntrySize-1;
-			}*/
 			Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
 
-			//main_bytes_onwards = Arrays.copyOfRange(data, mainAddr, (int) (mainAddr+(entry+textSize-mainAddr)));
-
-			int InstSize = 0;
+			
+			singleInstLinearSweep(entry, (int) textSize, data, cs);
 			
 			
-			while(entry+InstSize<entry+textSize) {
-				text_bytes = Arrays.copyOfRange(data, entry+InstSize, (int) (entry+textSize));
-				Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry+InstSize+0x400000,1);
-				InstSize += allInsn[0].size;
-			    System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic, allInsn[0].opStr);
-			}
+			disasmInstructionAtAddress((int) 0x9b0,data,cs,entry,textSize);
 			
-			/* CODE FOR SINGLE INST DSIASSEMBLY WOOOO
-			int InstSize = 0;
-			while(entry+InstSize<entry+textSize) {
-				text_bytes = Arrays.copyOfRange(data, entry+InstSize, (int) (entry+textSize));
-				Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry+InstSize+0x400000,1);
-				InstSize += allInsn[0].size;
-			    System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic, allInsn[0].opStr);
-			}*/
+			
 
 		} catch (Exception e1) {
 			e1.printStackTrace();
@@ -195,6 +173,26 @@ public class single_disasm {
 		}
 		
 
+	}
+	
+	private static void disassemble() {
+		
+	}
+	
+	private static Capstone.CsInsn disasmInstructionAtAddress(int address, byte[] data, Capstone cs, int entry, long textSize) {
+		byte[] instruction_bytes = Arrays.copyOfRange(data, (int) address, (int) address+15);
+		Capstone.CsInsn[] allInsn = cs.disasm(instruction_bytes,0x0,1);
+		return allInsn[0];
+	}
+	
+	private static void singleInstLinearSweep(int entry, int textSize, byte[] data, Capstone cs) {
+		int InstSize = 0;
+		while(entry+InstSize<entry+textSize) {
+			text_bytes = Arrays.copyOfRange(data, entry+InstSize, (int) (entry+textSize));
+			Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry+InstSize,1);
+			InstSize += allInsn[0].size;
+		    System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic, allInsn[0].opStr);
+		}
 	}
 	
 }

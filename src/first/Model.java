@@ -2,32 +2,17 @@ package first;
 
 public class Model {
 
-	private String firstname;
-	private String lastname;
+	private String file;
+	private int mode; 
 
-	public Model(String firstname, String lastname) {
-		this.firstname = firstname;
-		this.lastname = lastname;
-	}
+	// Instantiated upon file -> load or loading a file
+	public Model(String file, String mode) {
 
-	public String getFirstname() {
-		return firstname;
-	}
-
-	public void setFirstname(String firstname) {
-		this.firstname = firstname;
-	}
-
-	public String getLastname() {
-		return lastname;
-	}
-
-	public void setLastname(String lastname) {
-		this.lastname = lastname;
+		this.file = file;
 	}
 	
-	public void getCfg() {
-		
+	public void disassemble() {
+			
 	}
-
+	
 }
