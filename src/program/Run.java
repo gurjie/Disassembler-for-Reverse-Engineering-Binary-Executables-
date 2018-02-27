@@ -1,4 +1,4 @@
-package first;
+package program;
 
 public class Run {
 

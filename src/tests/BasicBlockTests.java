@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import capstone.Capstone;
 import elf.Elf;
 import elf.SectionHeader;
-import first.BasicBlock;
+import program.BasicBlock;
 
 class BasicBlockTests {
 	

@@ -1,4 +1,4 @@
-package first;
+package program;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -41,7 +41,7 @@ public class SymbolEntry {
 		// TODO Auto-generated constructor stub
 	}
 
-	public int getStrTabSize() {
+	private int getStrTabSize() {
 		// TODO Auto-generated method stub
 		return this.strtab_bytes.length;
 	}

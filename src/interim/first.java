@@ -1,4 +1,4 @@
-package first;
+package interim;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,6 +11,7 @@ import java.util.Scanner;
 import capstone.Capstone;
 import elf.Elf;
 import elf.SectionHeader;
+import program.SymbolEntry;
 
 /**
  * This program's overall operation is quite simple. See the program's activity

@@ -1,12 +1,15 @@
-package first;
+package program;
 
 import java.awt.FlowLayout;
+
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -30,6 +33,8 @@ public class View {
 	
 	private JMenuBar menuBar;
 	private JMenu menuFile;
+	private JMenuItem fileMenuLoad;
+	private JMenuItem fileMenuExit;
 	private JMenu menuEdit;
 	private JMenu menuHelp;
 	private JToolBar toolBar;
@@ -40,8 +45,10 @@ public class View {
 	private JButton zoomOutButton;
 	private JSplitPane encompassingPane;
 	private JSplitPane functionsPane;
-	private JPanel minigraphPanel;
-	private FlowLayout fl_minigraphPanel;
+	private JPanel sectionsPanel;
+	private JScrollPane sectionsScrollPane;
+	private JList<String> sectionsList;
+	private JLabel lblSections;
 	private JScrollPane listScrollPane;
 	private JList functionList;
 	private JLabel lblFunctions;
@@ -51,6 +58,8 @@ public class View {
 	private JScrollPane graphScrollPane;
 	private JPanel graphPane;
 	private FlowLayout fl_graphPane;
+	private DefaultListModel<String> sectionModel;
+
 	
 	public View(String title) {
 		frame = new JFrame(title);
@@ -61,6 +70,8 @@ public class View {
 		// Create UI elements
 		menuBar = new JMenuBar();
 		menuFile = new JMenu("File");
+		fileMenuLoad = new JMenuItem("Load Executable");		
+		fileMenuExit = new JMenuItem("Exit");		
 		menuEdit = new JMenu("Edit");
 		menuHelp = new JMenu("Help");
 		toolBar = new JToolBar();
@@ -71,7 +82,11 @@ public class View {
 		zoomOutButton = new JButton("Zoom Out");
 		encompassingPane = new JSplitPane();
 		functionsPane = new JSplitPane();
-		minigraphPanel = new JPanel();
+		sectionsPanel = new JPanel();
+		sectionsScrollPane = new JScrollPane();
+		sectionModel = new DefaultListModel<>();
+		sectionsList = new JList<>(sectionModel);
+		lblSections = new JLabel("ELF Sections");
 		listScrollPane = new JScrollPane();
 		functionList = new JList();
 		lblFunctions = new JLabel("Functions");
@@ -114,12 +129,24 @@ public class View {
 		frame.getContentPane().setLayout(layout);*/
 	}
 
+	public DefaultListModel<String> getSectionModel() {
+		return sectionModel;
+	}
+
 	public JMenuBar getMenuBar() {
 		return menuBar;
 	}
 
 	public JMenu getMenuFile() {
 		return menuFile;
+	}
+	
+	public JMenuItem getFileMenuLoad() {
+		return fileMenuLoad;
+	}
+	
+	public JMenuItem getFileMenuExit() {
+		return fileMenuExit;
 	}
 
 	public JMenu getMenuEdit() {
@@ -162,17 +189,22 @@ public class View {
 		return functionsPane;
 	}
 
-	public JPanel getMinigraphPanel() {
-		return minigraphPanel;
+	public JPanel getSectionsPanel() {
+		return sectionsPanel;
 	}
 	
-	public void setFlMinigraphPanel () {
-		fl_minigraphPanel = (FlowLayout) this.minigraphPanel.getLayout();
+	public JScrollPane getSectionsScrollPane() {
+		return sectionsScrollPane;
 	}
-	
-	public FlowLayout getFlMinigraphPanel () {
-		return this.fl_minigraphPanel;
+
+	public JList<String> getSectionsList() {
+		return sectionsList;
 	}
+
+	public JLabel getLblSections() {
+		return lblSections;
+	}
+
 
 	public JScrollPane getListScrollPane() {
 		return listScrollPane;

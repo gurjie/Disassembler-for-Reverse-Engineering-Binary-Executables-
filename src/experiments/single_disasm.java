@@ -1,18 +1,12 @@
-package first;
+package experiments;
 import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Scanner;
-
 import capstone.Capstone;
-import capstone.Capstone.CsInsn;
 import elf.Elf;
 import elf.SectionHeader;
+import program.SymbolEntry;
 
 
 public class single_disasm {
@@ -178,8 +172,17 @@ public class single_disasm {
 		
 	}
 	
+	/**
+	 * 
+	 * @param address address of the instruction in the [data] array
+	 * @param data array of bytes to read 
+	 * @param cs capstone instance
+	 * @param entry entry point of the ELf
+	 * @param textSize size of the text section
+	 * @return
+	 */
 	private static Capstone.CsInsn disasmInstructionAtAddress(int address, byte[] data, Capstone cs, int entry, long textSize) {
-		byte[] instruction_bytes = Arrays.copyOfRange(data, (int) address, (int) address+15);
+		byte[] instruction_bytes = Arrays.copyOfRange(data, (int) address, (int) address+20);
 		Capstone.CsInsn[] allInsn = cs.disasm(instruction_bytes,0x0,1);
 		return allInsn[0];
 	}

@@ -1,35 +1,30 @@
-package first;
+package program;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
+import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
-
-import com.mxgraph.canvas.mxICanvas;
-import com.mxgraph.layout.mxCircleLayout;
-import com.mxgraph.layout.mxFastOrganicLayout;
-import com.mxgraph.layout.mxGraphLayout;
 import com.mxgraph.layout.mxIGraphLayout;
-import com.mxgraph.layout.mxParallelEdgeLayout;
-import com.mxgraph.layout.mxPartitionLayout;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
-import com.mxgraph.model.mxCell;
 import com.mxgraph.swing.mxGraphComponent;
-import com.mxgraph.util.mxRectangle;
+import com.mxgraph.util.mxCellRenderer;
 import com.mxgraph.view.mxGraph;
-import com.mxgraph.view.mxGraphView;
 
 public class Controller {
 
 	private Model model;
 	private View view;
+	private mxGraph graph;
+	private boolean loaded;
 
 	public Controller(Model m, View v) {
 		model = m;
@@ -40,6 +35,8 @@ public class Controller {
 	public void initView() {
 		view.getFrame().setJMenuBar(view.getMenuBar());
 		view.getMenuBar().add(view.getMenuFile());
+		view.getMenuFile().add(view.getFileMenuLoad());
+		view.getMenuFile().add(view.getFileMenuExit());
 		view.getMenuBar().add(view.getMenuEdit());
 		view.getMenuBar().add(view.getMenuHelp());
 		view.getFrame().getContentPane().add(view.getToolBar(), BorderLayout.NORTH);
@@ -51,11 +48,11 @@ public class Controller {
 		view.getFrame().getContentPane().add(view.getEncompassingPane(), BorderLayout.CENTER);
 		view.getFunctionsPane().setOrientation(JSplitPane.VERTICAL_SPLIT);
 		view.getEncompassingPane().setLeftComponent(view.getFunctionsPane());
-		view.getMinigraphPanel().setBackground(Color.LIGHT_GRAY);
-		view.setFlMinigraphPanel();
-		view.getFlMinigraphPanel().setVgap(40);
-		view.getFlMinigraphPanel().setHgap(90);
-		view.getFunctionsPane().setRightComponent(view.getMinigraphPanel());
+		// view.getSectionsPanel().setBackground(Color.LIGHT_GRAY);
+		view.getSectionsList().setVisibleRowCount(14);
+		view.getSectionsScrollPane().setViewportView(view.getSectionsList());
+		view.getSectionsScrollPane().setColumnHeaderView(view.getLblSections());
+		view.getFunctionsPane().setRightComponent(view.getSectionsScrollPane());
 		view.getFunctionsPane().setLeftComponent(view.getListScrollPane());
 		view.getFunctionList().setVisibleRowCount(14);
 		view.getListScrollPane().setViewportView(view.getFunctionList());
@@ -73,6 +70,12 @@ public class Controller {
 	}
 
 	public void initController() {
+		view.getFileMenuLoad().addActionListener(e -> {
+			loadFile();
+		});
+		view.getFileMenuExit().addActionListener(e -> {
+			System.exit(0);
+		});
 		view.getLoadButton().addActionListener(e -> {
 			loadFile();
 		});
@@ -92,36 +95,86 @@ public class Controller {
 	}
 
 	private void graphScroll() {
-		System.out.println("SCrolled");
+		System.out.println("Scrolled");
 	}
 
 	private void loadFile() {
+		view.getSectionModel().removeAllElements();
 		JFileChooser fileChooser = new JFileChooser();
 		int returnValue = fileChooser.showOpenDialog(null);
 		if (returnValue == JFileChooser.APPROVE_OPTION) {
 			File selectedFile = fileChooser.getSelectedFile();
 			this.model.setFile(selectedFile);
 			try {
-				model.disassemble();
+				this.model.disassemble();
+				loaded = true;
+				for (Section s : this.model.getSections()) {
+					view.getSectionModel().addElement(s.getName());
+				}
+				if (!this.model.symTabExists()) {
+					JOptionPane.showMessageDialog(
+							new JFrame(), "The symbol table could not be "
+									+ "resolved. As a result, function names cannot be " + "displayed!",
+							"Warning", JOptionPane.WARNING_MESSAGE);
+				}
+
 			} catch (ReadException e) {
-				String message = e.getMessage();
-				JOptionPane.showMessageDialog(new JFrame(), message, "Exception", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Exception", JOptionPane.ERROR_MESSAGE);
 			} catch (ElfException e) {
-				String message = e.getMessage();
-				JOptionPane.showMessageDialog(new JFrame(), message, "Exeption", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Not an ELF", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 	}
 
 	private void export() {
-		System.out.println("Pressed");
+		if (this.loaded == true) {
+			try {
+				String home = System.getProperty("user.home");
+				String exportDirName = this.model.getFile().getName() + "_exports";
+				File exportDir = new File(home, exportDirName);
+				// if the directory does not exist, create it
+				if (!exportDir.exists()) {
+					System.out.println("creating directory: " + exportDir.getName());
+					boolean result = false;
+					try {
+						exportDir.mkdir();
+						result = true;
+					} catch (SecurityException e) {
+						JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Security Exception",
+								JOptionPane.ERROR_MESSAGE);
+					}
+					if (result) {
+						System.out.println("DIR created");
+					}
+				}
+				String exportName = "export.png";
+				int exportNumber = 0;
+				String exportFileName = "export";
+				String exportSuffix = ".png";
+				while (new File(home+"/"+exportDirName, exportName).exists()) {
+					exportNumber++;
+					exportName = exportFileName.concat(Integer.toString(exportNumber)).concat(exportSuffix);
+				}
+				System.out.println(exportName);
+
+				File newFile = new File(home + "/" + exportDirName, exportName);
+				BufferedImage image = mxCellRenderer.createBufferedImage(this.graph, null, 1, Color.WHITE, true, null);
+				ImageIO.write(image, "PNG", newFile);
+				JOptionPane.showMessageDialog(new JFrame(), "Exported CFG to " + newFile.getPath(), "Export Successful",
+						JOptionPane.INFORMATION_MESSAGE);
+			} catch (IOException e) {
+				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Export error", JOptionPane.ERROR_MESSAGE);
+			} catch (NullPointerException e) {
+				JOptionPane.showMessageDialog(new JFrame(), "No CFG to export", "Graph error", JOptionPane.ERROR_MESSAGE);
+			}
+		}
 	}
 
 	private void openCFG() {
 		view.getGraphPane().removeAll();
 		// initialise the control flow graph shower
 		// start the popup CFG with model.showCfg as input, which returns a string
-		mxGraph graph = new mxGraph();
+		this.graph = new mxGraph();
 
 		Object parent = graph.getDefaultParent();
 		graph.getModel().beginUpdate();

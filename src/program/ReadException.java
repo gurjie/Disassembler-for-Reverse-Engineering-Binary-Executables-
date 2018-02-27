@@ -1,4 +1,4 @@
-package first;
+package program;
 
 public class ReadException extends Exception{
 	public ReadException(String message) {

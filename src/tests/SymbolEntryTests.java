@@ -1,7 +1,7 @@
 package tests;
 import elf.Elf;
 import elf.SectionHeader;
-import first.SymbolEntry;
+import program.SymbolEntry;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,13 +67,14 @@ class SymbolEntryTests {
 		assertEquals("TEST 1: test the symboltable size is as expected", symbol.getSymTabSize(),this.symtab_size);
 	}*/
 	
-	@Test // test 2, added to the constructer and the appropriate getter
+	// changed this test to rivate visibility
+	/*@Test // test 2, added to the constructer and the appropriate getter
 	public void getMainStrtabSize() throws IOException {
 		setUp();
 		SymbolEntry symbol = new SymbolEntry(this.symtab_bytes,this.strtab_bytes);
 		slice_bytes = Arrays.copyOfRange(symtab_bytes, 2208, 2208+24);
 		assertEquals("TEST 2: test the symboltable size is as expected", symbol.getStrTabSize(),this.strtab_size);
-	}
+	}*/
 	
 	@Test // test 3, added name getter, returns main hard coded
 	public void getMainSymbolName() throws IOException {
