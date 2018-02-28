@@ -4,12 +4,12 @@ import java.util.ArrayList;
 
 import capstone.Capstone;
 
-public class BasicBlock {
+public class Block {
 	private int startAddress;
 	private ArrayList<Capstone.CsInsn> instructionBlock;
 	private int endAddress;
 	
-	public BasicBlock(Capstone.CsInsn first) {
+	public Block(Capstone.CsInsn first) {
 		instructionBlock = new ArrayList<Capstone.CsInsn>();
 		instructionBlock.add(first);
 		this.startAddress = (int) first.address;

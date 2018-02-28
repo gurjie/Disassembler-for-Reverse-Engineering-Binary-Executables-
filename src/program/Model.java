@@ -34,4 +34,8 @@ public class Model {
 		return this.instance.symTabExists();
 	}
 	
+	public List<Function> getFunctions() {
+		return this.instance.getFunctions();
+	}
+	
 }

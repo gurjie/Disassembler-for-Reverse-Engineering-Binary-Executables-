@@ -50,7 +50,7 @@ public class View {
 	private JList<String> sectionsList;
 	private JLabel lblSections;
 	private JScrollPane listScrollPane;
-	private JList functionList;
+	private JList<Function> functionList;
 	private JLabel lblFunctions;
 	private JSplitPane mainPane; // The pane splitting graph and instruction panels
 	private JScrollPane instScrollPane;
@@ -59,6 +59,7 @@ public class View {
 	private JPanel graphPane;
 	private FlowLayout fl_graphPane;
 	private DefaultListModel<String> sectionModel;
+	private DefaultListModel<Function> functionModel;
 
 	
 	public View(String title) {
@@ -88,7 +89,8 @@ public class View {
 		sectionsList = new JList<>(sectionModel);
 		lblSections = new JLabel("ELF Sections");
 		listScrollPane = new JScrollPane();
-		functionList = new JList();
+		functionModel = new DefaultListModel<Function>();
+		functionList = new JList<>(functionModel);
 		lblFunctions = new JLabel("Functions");
 		mainPane = new JSplitPane();
 		instScrollPane = new JScrollPane();
@@ -131,6 +133,10 @@ public class View {
 
 	public DefaultListModel<String> getSectionModel() {
 		return sectionModel;
+	}
+	
+	public DefaultListModel<Function> getFunctionModel() {
+		return functionModel;
 	}
 
 	public JMenuBar getMenuBar() {
@@ -210,7 +216,7 @@ public class View {
 		return listScrollPane;
 	}
 
-	public JList getFunctionList() {
+	public JList<Function> getFunctionList() {
 		return functionList;
 	}
 	
@@ -261,70 +267,5 @@ public class View {
 	public void resetGraphScrollPane() {
 		this.graphScrollPane = new JScrollPane();
 	}
-
-	/*
-	public JLabel getFirstnameLabel() {
-		return firstnameLabel;
-	}
-
-	public void setFirstnameLabel(JLabel firstnameLabel) {
-		this.firstnameLabel = firstnameLabel;
-	}
-
-	public JLabel getLastnameLabel() {
-		return lastnameLabel;
-	}
-
-	public void setLastnameLabel(JLabel lastnameLabel) {
-		this.lastnameLabel = lastnameLabel;
-	}
-
-	public JTextField getFirstnameTextfield() {
-		return firstnameTextfield;
-	}
-
-	public void setFirstnameTextfield(JTextField firstnameTextfield) {
-		this.firstnameTextfield = firstnameTextfield;
-	}
-
-	public JTextField getLastnameTextfield() {
-		return lastnameTextfield;
-	}
-
-	public void setLastnameTextfield(JTextField lastnameTextfield) {
-		this.lastnameTextfield = lastnameTextfield;
-	}
-
-	public JButton getFirstnameSaveButton() {
-		return firstnameSaveButton;
-	}
-
-	public void setFirstnameSaveButton(JButton firstnameSaveButton) {
-		this.firstnameSaveButton = firstnameSaveButton;
-	}
-
-	public JButton getLastnameSaveButton() {
-		return lastnameSaveButton;
-	}
-
-	public void setLastnameSaveButton(JButton lastnameSaveButton) {
-		this.lastnameSaveButton = lastnameSaveButton;
-	}
-
-	public JButton getHello() {
-		return hello;
-	}
-
-	public void setHello(JButton hello) {
-		this.hello = hello;
-	}
-
-	public JButton getBye() {
-		return bye;
-	}
-
-	public void setBye(JButton bye) {
-		this.bye = bye;
-	}*/
 
 }

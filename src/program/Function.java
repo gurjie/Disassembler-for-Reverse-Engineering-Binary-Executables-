@@ -1,11 +1,16 @@
 package program;
 
 public class Function {
-	long startAddr;
-	long endAddr; 
+	private long startAddr;
+	private long endAddr; 
+	private String name;
 	
-	public Function() {
-		
+	public Function(String name) {
+		this.name = name;
+	}
+	
+	public String getName() {
+		return this.name;
 	}
 	
 	public void setStartAddr(long start) {
@@ -22,5 +27,10 @@ public class Function {
 	
 	public long getEndAddr() {
 		return this.endAddr;
+	}
+	
+	@Override
+	public String toString() {
+		return this.name;
 	}
 }

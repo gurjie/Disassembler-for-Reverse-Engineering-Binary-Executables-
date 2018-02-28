@@ -2,6 +2,7 @@ package program;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -9,10 +10,14 @@ import java.io.File;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
+import javax.swing.event.ListSelectionEvent;
+
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.swing.mxGraphComponent;
@@ -25,6 +30,7 @@ public class Controller {
 	private View view;
 	private mxGraph graph;
 	private boolean loaded;
+	private Function selectedFunction;
 
 	public Controller(Model m, View v) {
 		model = m;
@@ -94,11 +100,28 @@ public class Controller {
 		// view.getBye().addActionListener(e -> sayBye());
 	}
 
+	public void initFunctionsListener() {
+		view.getFunctionList().addMouseListener(new MouseAdapter() {
+		    public void mouseClicked(MouseEvent evt) {
+		        JList list = (JList)evt.getSource();
+		        if (evt.getClickCount() == 2) {
+		        	
+		            // Double-click detected
+		            int index = list.locationToIndex(evt.getPoint());
+		            selectedFunction = view.getFunctionList().getSelectedValue();
+		            System.out.println(selectedFunction.getName());
+		        } 
+		    }
+		});
+	}
+
+	
 	private void graphScroll() {
 		System.out.println("Scrolled");
 	}
 
 	private void loadFile() {
+		view.getFunctionModel().removeAllElements();
 		view.getSectionModel().removeAllElements();
 		JFileChooser fileChooser = new JFileChooser();
 		int returnValue = fileChooser.showOpenDialog(null);
@@ -116,6 +139,32 @@ public class Controller {
 							new JFrame(), "The symbol table could not be "
 									+ "resolved. As a result, function names cannot be " + "displayed!",
 							"Warning", JOptionPane.WARNING_MESSAGE);
+				} else {
+					for (Function func : this.model.getFunctions()) {
+						view.getFunctionModel().addElement(func);
+		                view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
+
+		                     @Override
+		                     public Component getListCellRendererComponent(JList list, Object value, int index,
+		                               boolean isSelected, boolean cellHasFocus) {
+		                          Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+		                          if (value instanceof Function) {
+		                               Function function = (Function) value;
+		                               setText(function.getName());
+		                               if (function.getStartAddr()==0) {
+		                                    setForeground(Color.RED);
+		                               } else {
+		                                    setForeground(Color.BLUE);
+		                               }
+		                          } else {
+		                               // do nothing
+		                          }
+		                          return c;
+		                     }
+
+		                });
+					}
+					initFunctionsListener();
 				}
 
 			} catch (ReadException e) {
@@ -151,7 +200,7 @@ public class Controller {
 				int exportNumber = 0;
 				String exportFileName = "export";
 				String exportSuffix = ".png";
-				while (new File(home+"/"+exportDirName, exportName).exists()) {
+				while (new File(home + "/" + exportDirName, exportName).exists()) {
 					exportNumber++;
 					exportName = exportFileName.concat(Integer.toString(exportNumber)).concat(exportSuffix);
 				}
@@ -165,7 +214,8 @@ public class Controller {
 			} catch (IOException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Export error", JOptionPane.ERROR_MESSAGE);
 			} catch (NullPointerException e) {
-				JOptionPane.showMessageDialog(new JFrame(), "No CFG to export", "Graph error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(new JFrame(), "No CFG to export", "Graph error",
+						JOptionPane.ERROR_MESSAGE);
 			}
 		}
 	}
@@ -215,24 +265,6 @@ public class Controller {
 			graph.insertEdge(parent, null, "", v7, v8);
 			graph.insertEdge(parent, null, "", v1, v9);
 			graph.insertEdge(parent, null, "", v4, v10);
-			graph.insertEdge(parent, null, "", v6, v4);
-			graph.insertEdge(parent, null, "", v4, v1);
-			graph.insertEdge(parent, null, "", v7, v11);
-			graph.insertEdge(parent, null, "", v12, v2);
-			graph.insertEdge(parent, null, "", v4, v15);
-			graph.insertEdge(parent, null, "", v19, v1);
-			graph.insertEdge(parent, null, "", v10, v3);
-			graph.insertEdge(parent, null, "", v9, v10);
-			graph.insertEdge(parent, null, "", v17, v11);
-			graph.insertEdge(parent, null, "", v14, v16);
-			graph.insertEdge(parent, null, "", v5, v14);
-
-			graph.insertEdge(parent, null, "", v1, v17);
-			graph.insertEdge(parent, null, "", v4, v12);
-			graph.insertEdge(parent, null, "", v13, v7);
-			graph.insertEdge(parent, null, "", v18, v10);
-			graph.insertEdge(parent, null, "", v18, v3);
-			graph.insertEdge(parent, null, "", v15, v11);
 
 			graph.setCellsDisconnectable(false);
 			graph.setEdgeLabelsMovable(false);
