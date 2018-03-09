@@ -2,7 +2,6 @@ package program;
 
 public class Address {
 	int address;
-	Instruction instruction;
 	boolean visited;
 	
 	public Address(int address) {

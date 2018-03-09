@@ -13,6 +13,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTable;
 import javax.swing.JToolBar;
 
 public class View {
@@ -55,6 +56,7 @@ public class View {
 	private JSplitPane mainPane; // The pane splitting graph and instruction panels
 	private JScrollPane instScrollPane;
 	private JPanel instPanel;
+	private JTable instTable;
 	private JScrollPane graphScrollPane;
 	private JPanel graphPane;
 	private FlowLayout fl_graphPane;
@@ -130,6 +132,15 @@ public class View {
 		layout.linkSize(SwingConstants.HORIZONTAL, hello, bye);
 		frame.getContentPane().setLayout(layout);*/
 	}
+
+	public JTable getInstTable() {
+		return instTable;
+	}
+	
+	/*
+	public void setInstTable(Object content, String[] columnNames) {
+		this.instTable = new JTable(content,columnNames);
+	}*/
 
 	public DefaultListModel<String> getSectionModel() {
 		return sectionModel;

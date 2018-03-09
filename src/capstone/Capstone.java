@@ -20,6 +20,7 @@ import java.lang.RuntimeException;
 public class Capstone {
 
   protected static abstract class OpInfo {};
+  
   protected static abstract class UnionOpInfo extends Structure {};
 
   public static class UnionArch extends Union {

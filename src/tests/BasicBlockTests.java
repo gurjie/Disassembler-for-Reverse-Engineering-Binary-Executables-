@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import capstone.Capstone;
 import elf.Elf;
 import elf.SectionHeader;
-import program.Block;
+import program.BasicBlock;
 
 class BasicBlockTests {
 	
@@ -56,42 +56,42 @@ class BasicBlockTests {
 	@Test //test 1, created getter for address hard coded to return 1
 	void blockSizeTest() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
 		assertEquals("TEST 1: instructions are added to block", block.getBlockSize(),1);
 	}
 	
 	@Test //test 2, created getter for first addr hardcoded
 	void firstAddressTest() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
 		assertEquals("TEST 2: test first instruction in block is right", block.getStartAddress(),0x9b0);
 	}
 	
 	@Test //test 3, added getter for last address
 	void lastAddressTest() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
 		assertEquals("TEST 3: test last instruction in block is right", block.getLastAddress(),0x9b0);
 	}
 	
 	@Test //test 4, made so getter actually gets last address and LA is set in constructor
 	void lastAddressTest2() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b2,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b2,this.data,this.cs));
 		assertEquals("TEST 4: test last instruction in block is right", block.getLastAddress(),0x9b2);
 	}
 	
 	@Test //test 5, made so getter actually gets first address and FA is set in constructor
 	void firstAddressTest2() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b2,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b2,this.data,this.cs));
 		assertEquals("TEST 5: test first instruction in block is right", block.getStartAddress(),0x9b2);
 	}
 	
 	@Test //test 6 now instructions are actually added to the block
 	void testFirstInstructionInBlock() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
 		assertEquals("TEST 6: test first instruction in block is right", 
 				block.getFirstInstruction().address,disasmInstructionAtAddress(0x9b0,this.data,this.cs).address);
 	}
@@ -99,7 +99,7 @@ class BasicBlockTests {
 	@Test //test 6 now instructions are actually added to the block
 	void testSecondInstructionInBlock() throws IOException {
 		setup();
-		Block block = new Block(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
+		BasicBlock block = new BasicBlock(disasmInstructionAtAddress(0x9b0,this.data,this.cs));
 		assertEquals("TEST 6: test first instruction in block is right", 
 				block.getFirstInstruction().address,disasmInstructionAtAddress(0x9b0,this.data,this.cs).address);
 	}

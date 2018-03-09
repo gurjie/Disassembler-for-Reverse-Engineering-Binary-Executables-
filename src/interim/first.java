@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.acl.Group;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
 import capstone.Capstone;
+import capstone.Capstone.CsInsn;
+import capstone.X86;
 import elf.Elf;
 import elf.SectionHeader;
 import program.SymbolEntry;
@@ -137,6 +140,7 @@ public class first {
 			textBytes = Arrays.copyOfRange(data, entry, data.length-1); // defines bytes to disassembly
 			
 			Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
+			cs.setDetail(2);
 			Capstone.CsInsn[] allInsn = cs.disasm(textBytes, entry+0x400000);	 
 			// print every instruction in the disassembled set
 			for (int iv=0; iv<allInsn.length; iv++) {
@@ -147,8 +151,17 @@ public class first {
 						}
 					}
 				}
-			    System.out.printf("0x%x:\t%s\t%s", allInsn[iv].address, allInsn[iv].mnemonic, allInsn[iv].opStr);
-			    System.out.print("          "+allInsn[iv].operands+"\n");
+				/*
+			    for(byte b:allInsn[iv].groups) {
+			    	if(allInsn[iv].groups[0]==(Capstone.CS_GRP_JUMP)) {
+			    		System.out.print("is a jump:::");
+			    	}
+			    }*/
+				//System.out.println(allInsn[iv].groups);
+				
+				
+			    System.out.printf("0x%x:\t%s\t%s\n", allInsn[iv].address, allInsn[iv].mnemonic, allInsn[iv].opStr);
+			    //System.out.print("          "+allInsn[iv].operands+"\n");
 			}
 		} catch (Exception e1) {
 			// just disassemble as normal if there's no symbol entry table
