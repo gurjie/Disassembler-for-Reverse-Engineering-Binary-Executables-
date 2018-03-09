@@ -141,12 +141,12 @@ public class first {
 			
 			Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
 			cs.setDetail(2);
-			Capstone.CsInsn[] allInsn = cs.disasm(textBytes, entry+0x400000);	 
+			Capstone.CsInsn[] allInsn = cs.disasm(textBytes, entry);	 
 			// print every instruction in the disassembled set
 			for (int iv=0; iv<allInsn.length; iv++) {
-				if(symbolAddresses.contains(allInsn[iv].address)) {
+				if(symbolAddresses.contains(allInsn[iv].address+0x400000)) {
 					for(SymbolEntry s:symbolEntries) {
-						if(allInsn[iv].address==s.getAddress()) {
+						if(allInsn[iv].address+0x400000==s.getAddress()) {
 							System.out.println("\n<"+s.getName()+">");
 						}
 					}

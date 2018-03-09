@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +34,7 @@ public class Disassemble {
 	private Capstone cs;
 	private ArrayList<Capstone.CsInsn> failedDisassemblyTargets = new ArrayList<Capstone.CsInsn>();
 	private Set<String> conditionalCtis = new HashSet<String>();
+	ArrayList<BasicBlock> blockList;
 
 	public Disassemble(File f) throws ReadException, ElfException {
 		try {
@@ -58,13 +61,30 @@ public class Disassemble {
 		setSections();
 		resolveSymbols();
 		buildConditionalCtis();
+		
+		int main = 0;
 		for (Function funct : functions) {
 			if (funct.getName().equals("main")) {
-				this.entry = (int) funct.getStartAddr() - 0x400000;
+				main = (int) funct.getStartAddr() - 0x400000;
 
 			}
 		}
-		disasm(entry);
+		System.out.println(this.entry);
+
+		blockList = new ArrayList<BasicBlock>();
+		disasm(main);
+		Collections.sort(blockList,new Comparator<BasicBlock>() {
+			@Override
+			public int compare(BasicBlock o1, BasicBlock o2) {
+				return (o1.getFirst() - o2.getFirst());
+			}
+			
+		});
+		
+		for(BasicBlock block : blockList) {				
+			block.printInstructions();
+		}
+		
 
 		// disasm(cs,entry,)
 		// Load the two tables' size and file offset information
@@ -75,48 +95,60 @@ public class Disassemble {
 
 	public BasicBlock disasm(int address) {
 		BasicBlock current = new BasicBlock();
+		this.blockList.add(current);
 		if (this.knownAddresses.contains(address)) {
 			return current;
 		}
 		do {
 			Capstone.CsInsn instruction;
 			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
-			System.out.printf("0x%x:\t%s\t%s\n", instruction.address, instruction.mnemonic, instruction.opStr);
+			//System.out.printf("0x%x:\t%s\t%s\n",(int) instruction.address, instruction.mnemonic, instruction.opStr);
 			current.addInstruction(instruction);
-			if (isReturnInstruction(instruction)) {
+			/*if (isReturnInstruction(instruction)) {
 				return current;
 			} else if (isUnconditionalCti(instruction)) {
-				try {
-					getTargetAddress(instruction);
-					current.addAddressReference(getTargetAddress(instruction));
-					return disasm(getTargetAddress(instruction));
-				} catch (AddressResolutionException e) {
-					System.out.println(e.getMessage());
-					failedDisassemblyTargets.add(instruction);
-					address += instruction.size;
-				}
-			} else if (isConditionalCti(instruction)) {
-				try {
-					int jumpAddr = getTargetAddress(instruction);
-					int continueAddr = address + instruction.size;
-					current.addAddressReference(getTargetAddress(instruction));
-					ArrayList<Integer> possibleTargets = new ArrayList<Integer>();
-					possibleTargets.add(jumpAddr);
-					possibleTargets.add(continueAddr);
-					for (int addr : possibleTargets) {
-						return disasm(addr);
+				int destinationAddr = getTargetAddress(instruction);
+				if (destinationAddr != -1) {
+					if (destinationAddr < entry || destinationAddr > entry+textSize) {
+						int continueAddr = address + instruction.size;
+						return current;
+					}  else {
+						current.addAddressReference(getTargetAddress(instruction));
+						return disasm(getTargetAddress(instruction));
 					}
-				} catch (AddressResolutionException e) {
-					System.out.println(e.getMessage());
-					failedDisassemblyTargets.add(instruction);
-					address += instruction.size;
+				} else {
+					current.addPtrReference(instruction.opStr);
 				}
 
-			} else {
+			}*/ if (isConditionalCti(instruction)||isUnconditionalCti(instruction)) {
+				ArrayList<Integer> possibleTargets = new ArrayList<Integer>();
+				int jumpAddr = getTargetAddress(instruction); // determine CTI destination
+				if (jumpAddr != -1) { // if dest can be reached
+					if (jumpAddr > entry && jumpAddr < entry+textSize) { // if within text section
+						current.addAddressReference(jumpAddr); // ignore for now
+						possibleTargets.add(jumpAddr); // one target to disassemble at
+					} else {
+						address += instruction.size; // if its outside of scope of text disasm next
+						continue;
+						
+					}
+				} else {
+					current.addPtrReference(instruction.opStr);
+				}
+				int continueAddr = address + instruction.size; // diasm at enxt inst address
+				possibleTargets.add(continueAddr); // add next address to possible target
+				current.addAddressReference(continueAddr); // ignore for now
+				for (int addr : possibleTargets) { // for all possible disassemble targets
+					if (this.knownAddresses.contains(addr)) { // if the address hasn't been disasm already
+						continue; // skip to the next disasm target
+					}
+					return disasm(addr); // disasm at first address (recursive)
+				}
+			} else { // its not a CTI so disasm next
 				address += instruction.size;
 			}
 
-		} while (address >= entry && address <= entry + textSize);
+		} while (address <= entry + textSize);
 		return current;
 	}
 
@@ -211,14 +243,12 @@ public class Disassemble {
 
 	}
 
-	private int getTargetAddress(Capstone.CsInsn instruction) throws AddressResolutionException {
+	private int getTargetAddress(Capstone.CsInsn instruction) {
 		try {
 			long address = Long.decode(instruction.opStr.trim());
 			return (int) address;
 		} catch (NumberFormatException e) {
-			throw new AddressResolutionException("The address for instruction at " + instruction.address
-					+ " could not be converted to a raw address." + "The Instruction is: " + instruction.mnemonic + "\t"
-					+ instruction.opStr);
+			return -1;
 		}
 	}
 
@@ -267,9 +297,8 @@ public class Disassemble {
 		byte[] instruction_bytes = Arrays.copyOfRange(data, (int) address, (int) address + 15);
 		Capstone.CsInsn[] allInsn = this.cs.disasm(instruction_bytes, 0x0 + address, 1);
 		if (allInsn.length > 0) {
-			for (int i = 0; i < allInsn[0].size; i++) {
-				this.knownAddresses.add(address + i);
-			}
+			this.knownAddresses.add(address);
+	
 			// System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic,
 			// allInsn[0].opStr);
 			return allInsn[0];
