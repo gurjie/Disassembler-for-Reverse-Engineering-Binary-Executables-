@@ -171,6 +171,9 @@ public class Controller {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Exception", JOptionPane.ERROR_MESSAGE);
 			} catch (ElfException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Not an ELF", JOptionPane.ERROR_MESSAGE);
+			} catch (MainDiscoveryException e) {
+				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Couldn't find main()", JOptionPane.ERROR_MESSAGE);
+				e.printStackTrace();
 			}
 		}
 	}

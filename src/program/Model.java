@@ -2,6 +2,7 @@ package program;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class Model {
@@ -22,7 +23,7 @@ public class Model {
 		return this.file;
 	}
 	
-	public void disassemble() throws ReadException, ElfException {
+	public void disassemble() throws ReadException, ElfException, MainDiscoveryException {
 			this.instance = new Disassemble(this.file);
 	}
 	
@@ -36,6 +37,10 @@ public class Model {
 	
 	public List<Function> getFunctions() {
 		return this.instance.getFunctions();
+	}
+	
+	public ArrayList<BasicBlock> getBasicBlocks() {
+		return this.instance.getBasicBlocks();
 	}
 	
 }

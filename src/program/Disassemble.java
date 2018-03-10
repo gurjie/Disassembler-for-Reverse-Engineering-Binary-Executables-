@@ -10,33 +10,36 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import capstone.Capstone;
+import capstone.Capstone.CsInsn;
 import elf.Elf;
 import elf.SectionHeader;
 
 public class Disassemble {
-
+	private Elf elf;
+	private int entry;
+	private byte[] data;
+	private int textSize;
+	private byte[] text_bytes;
 	private boolean symtabExists;
 	private boolean strtabExists;
 	private SectionHeader symtab;
 	private SectionHeader strtab;
-	private Elf elf;
-	private byte[] data;
-	private byte[] text_bytes;
-	private int textSize;
-	private int entry;
-	private ArrayList<Function> functions = new ArrayList<Function>();
+	private ArrayList<Integer> possibleTargets = new ArrayList<Integer>();
 	private HashSet<Integer> knownAddresses = new HashSet<Integer>();
+	private List<Section> sections = new ArrayList<Section>();
+	private ArrayList<Function> functions = new ArrayList<Function>();
 	private ArrayList<Long> symbolAddresses = new ArrayList<Long>(); // Holds addresses of symbols read
 	private ArrayList<SymbolEntry> symbolEntries = new ArrayList<SymbolEntry>(); // Symbol table entries
-	private List<Section> sections = new ArrayList<Section>();
+
 	private Capstone cs;
-	private ArrayList<Capstone.CsInsn> failedDisassemblyTargets = new ArrayList<Capstone.CsInsn>();
+
 	private Set<String> conditionalCtis = new HashSet<String>();
 	ArrayList<BasicBlock> blockList;
 
-	public Disassemble(File f) throws ReadException, ElfException {
+	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
 		try {
 			this.data = Files.readAllBytes(f.toPath());
 		} catch (IOException e) {
@@ -52,103 +55,101 @@ public class Disassemble {
 		this.textSize = (int) getTextSection(elf).size;
 		this.text_bytes = Arrays.copyOfRange(data, entry, (int) (entry + textSize));
 		this.cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
-		// Capstone.CsInsn inst = disasmInstructionAtAddress(entry, data, cs, entry,
-		// textSize);
-		// System.out.printf("0x%x:\t%s\t%s\n", inst.address, inst.mnemonic,
-		// inst.opStr);
-		// System.out.println(inst.size);
 
 		setSections();
 		resolveSymbols();
 		buildConditionalCtis();
-		
-		int main = 0;
-		for (Function funct : functions) {
-			if (funct.getName().equals("main")) {
-				main = (int) funct.getStartAddr() - 0x400000;
-
-			}
-		}
-		System.out.println(this.entry);
-
-		blockList = new ArrayList<BasicBlock>();
+		int main = setMain();
+		System.out.println(main);
+		this.blockList = new ArrayList<BasicBlock>();
+		this.possibleTargets.add(main);
 		disasm(main);
-		Collections.sort(blockList,new Comparator<BasicBlock>() {
+		sortBlockList();
+		for (BasicBlock block : blockList) {
+			System.out.println(block.getFirst());
+		}
+	}
+	
+	public ArrayList<BasicBlock> getBasicBlocks() {
+		return this.blockList;
+	}
+	
+	private void sortBlockList() {
+		Collections.sort(blockList, new Comparator<BasicBlock>() {
 			@Override
 			public int compare(BasicBlock o1, BasicBlock o2) {
 				return (o1.getFirst() - o2.getFirst());
 			}
-			
 		});
-		
-		for(BasicBlock block : blockList) {				
-			block.printInstructions();
+	}
+	
+	private int setMain() throws MainDiscoveryException {
+		if (this.symtabExists&&this.strtabExists) {
+			for (Function funct : functions) {
+				if (funct.getName().equals("main")) {
+					return (int) funct.getStartAddr()-0x400000;
+				}
+			}
+		} else {
+			if(discoverMain(entry, textSize, data)==-1) {
+				throw new MainDiscoveryException("Couldn't resolve main due to discovery heuristic failing!");
+			} else {
+				return discoverMain(entry, textSize, data);
+			}
 		}
-		
-
-		// disasm(cs,entry,)
-		// Load the two tables' size and file offset information
-		// Capstone cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
-		// ingleInstLinearSweep(entry, textSize, data, cs);
-		// discoverFunctions(entry, textSize, data, cs);
+		throw new MainDiscoveryException("Couldn't resolve main: Issue resolving from symbol table.");
+	}
+	
+	private void disasm(int address) {
+		for (int i = 0; i < this.possibleTargets.size(); i++) {
+			BasicBlock current = buildBlock(this.possibleTargets.get(i));
+			if(current.getBlockSize()!=0) {
+				this.blockList.add(current);
+			}
+		}
 	}
 
-	public BasicBlock disasm(int address) {
+
+	private BasicBlock buildBlock(int address) {
 		BasicBlock current = new BasicBlock();
-		this.blockList.add(current);
-		if (this.knownAddresses.contains(address)) {
-			return current;
-		}
-		do {
+		while (address < entry + textSize) {
+			if (this.knownAddresses.contains(address)) {
+				return current;
+			}
 			Capstone.CsInsn instruction;
 			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
-			//System.out.printf("0x%x:\t%s\t%s\n",(int) instruction.address, instruction.mnemonic, instruction.opStr);
+			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
 			current.addInstruction(instruction);
-			/*if (isReturnInstruction(instruction)) {
-				return current;
-			} else if (isUnconditionalCti(instruction)) {
-				int destinationAddr = getTargetAddress(instruction);
-				if (destinationAddr != -1) {
-					if (destinationAddr < entry || destinationAddr > entry+textSize) {
-						int continueAddr = address + instruction.size;
-						return current;
-					}  else {
-						current.addAddressReference(getTargetAddress(instruction));
-						return disasm(getTargetAddress(instruction));
-					}
-				} else {
-					current.addPtrReference(instruction.opStr);
-				}
 
-			}*/ if (isConditionalCti(instruction)||isUnconditionalCti(instruction)) {
-				ArrayList<Integer> possibleTargets = new ArrayList<Integer>();
-				int jumpAddr = getTargetAddress(instruction); // determine CTI destination
+			if (instruction.mnemonic.equals("ret")) {
+				return current;
+			}
+
+			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
+				int jumpAddr = getTargetAddress(instruction)-0x400000; // determine CTI destination
 				if (jumpAddr != -1) { // if dest can be reached
-					if (jumpAddr > entry && jumpAddr < entry+textSize) { // if within text section
-						current.addAddressReference(jumpAddr); // ignore for now
-						possibleTargets.add(jumpAddr); // one target to disassemble at
+					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
+						if (!this.knownAddresses.contains(jumpAddr)) {
+							this.possibleTargets.add(jumpAddr); // one target to disassemble at
+							current.addAddressReference(jumpAddr);
+						}
 					} else {
+						current.addAddressReferenceOutOfScope(jumpAddr);
 						address += instruction.size; // if its outside of scope of text disasm next
 						continue;
-						
+
 					}
-				} else {
-					current.addPtrReference(instruction.opStr);
 				}
 				int continueAddr = address + instruction.size; // diasm at enxt inst address
-				possibleTargets.add(continueAddr); // add next address to possible target
-				current.addAddressReference(continueAddr); // ignore for now
-				for (int addr : possibleTargets) { // for all possible disassemble targets
-					if (this.knownAddresses.contains(addr)) { // if the address hasn't been disasm already
-						continue; // skip to the next disasm target
-					}
-					return disasm(addr); // disasm at first address (recursive)
+				if (!this.knownAddresses.contains(continueAddr)&&!instruction.mnemonic.equals("jmp")) {
+					this.possibleTargets.add(continueAddr); // add next address to possible target
+					current.addAddressReference(continueAddr);
 				}
+				return current;
 			} else { // its not a CTI so disasm next
 				address += instruction.size;
 			}
-
-		} while (address <= entry + textSize);
+		}
 		return current;
 	}
 
@@ -251,31 +252,18 @@ public class Disassemble {
 			return -1;
 		}
 	}
-
-	/*
-	 * private void discoverFunctions(int entry, int textSize, byte[] data, Capstone
-	 * cs) { int address = entry; while (address<entry+textSize) { Capstone.CsInsn
-	 * instruction = disasmInstructionAtAddress(address,data,cs,entry,textSize,1);
-	 * if (instruction!=null) { if (instruction.mnemonic.equals("push")) {
-	 * //System.out.println(instruction.insnName()); Capstone.CsInsn
-	 * secondInstruction = disasm2AtAddress(address,data,cs,entry,textSize); if
-	 * (secondInstruction.mnemonic.equals("mov")) {
-	 * if(instruction.opStr.equals("rbp")) { if
-	 * (secondInstruction.opStr.equals("rbp, rsp")) { Function function = new
-	 * Function();
-	 * 
-	 * } } }
-	 * 
-	 * } } }
-	 * 
-	 * address+=1;
-	 * 
-	 * 
-	 * }
-	 */
+	
+	private int resolveAddressFromString(String string) {
+		try {
+			long address = Long.decode(string.trim());
+			return (int) address;
+		} catch (NumberFormatException e) {
+			return -1;
+		}
+	}
 
 	/**
-	 * 
+	 * Disassemble instruction at some address. Adds the address to a set of known addresses.
 	 * @param address
 	 *            address in the byte data representing the file to disassemble at
 	 * @param data
@@ -295,12 +283,9 @@ public class Disassemble {
 	 */
 	private Capstone.CsInsn disasmInstructionAtAddress(int address, byte[] data, int entry, long textSize) {
 		byte[] instruction_bytes = Arrays.copyOfRange(data, (int) address, (int) address + 15);
-		Capstone.CsInsn[] allInsn = this.cs.disasm(instruction_bytes, 0x0 + address, 1);
+		Capstone.CsInsn[] allInsn = this.cs.disasm(instruction_bytes, 0x400000 + address, 1);
 		if (allInsn.length > 0) {
 			this.knownAddresses.add(address);
-	
-			// System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic,
-			// allInsn[0].opStr);
 			return allInsn[0];
 		}
 		return null;
@@ -338,15 +323,45 @@ public class Disassemble {
 		this.conditionalCtis.add("jo");
 		this.conditionalCtis.add("js");
 	}
-	/*
-	 * private static Capstone.CsInsn disasm2AtAddress(int address, byte[] data,
-	 * Capstone cs, int entry, long textSize) { byte[] instruction_bytes =
-	 * Arrays.copyOfRange(data, (int) address, (int) address+15); Capstone.CsInsn[]
-	 * allInsn = cs.disasm(instruction_bytes,0x0+address,2); if(allInsn.length>0) {
-	 * //System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address,
-	 * allInsn[0].mnemonic, allInsn[0].opStr); return allInsn[1]; } return null; }
-	 */
-
+	
+	private int discoverMain(int entry, int textSize, byte[] data) {
+		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>();
+		text_bytes = Arrays.copyOfRange(data, entry, (int) (entry + 15));
+		Capstone.CsInsn[] first = cs.disasm(text_bytes, entry, 1);
+		Capstone.CsInsn instruction = first[0];
+		startInstructions.add(instruction);
+		int InstSize = instruction.size;
+		while (!instruction.mnemonic.equals("hlt")) {
+			text_bytes = Arrays.copyOfRange(data, entry + InstSize, (int) (entry + 100));
+			Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry + InstSize, 1);
+			startInstructions.add(allInsn[0]);
+			instruction = allInsn[0];
+			InstSize += instruction.size;
+		}
+		int index = startInstructions.size()-2;
+		while (!startInstructions.get(index).mnemonic.equals("call")) {
+			index-=1;
+		}
+		if(startInstructions.get(index).mnemonic.equals("call")) {
+			if(startInstructions.get(index-1).mnemonic.equals("mov")) {
+				System.out.println(startInstructions.get(index-1).opStr);
+				String[] operands = startInstructions.get(index-1).opStr.split(",");
+				for (String s : operands) {
+					if (resolveAddressFromString(s)!=-1) {
+						return (int) resolveAddressFromString(s)-0x400000;
+					} 
+				}
+				return -1;
+			} else if(startInstructions.get(index-1).mnemonic.equals("push")) {
+				return (int) resolveAddressFromString(startInstructions.get(index-1).opStr)-0x400000;
+			} else {
+				return -1;
+			}
+		}
+		return -1;
+	}
+	
+	/* peerform a single instruction linear sweep for testing purposes
 	private void singleInstLinearSweep(int entry, int textSize, byte[] data, Capstone cs) {
 		int InstSize = 0;
 		while (entry + InstSize < entry + textSize) {
@@ -355,7 +370,7 @@ public class Disassemble {
 			InstSize += allInsn[0].size;
 			System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic, allInsn[0].opStr);
 		}
-	}
+	}*/
 
 	private SectionHeader getTextSection(Elf elf) {
 		for (SectionHeader shrs : elf.sectionHeaders) {

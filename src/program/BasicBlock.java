@@ -1,6 +1,7 @@
 package program;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import capstone.Capstone;
@@ -10,11 +11,11 @@ public class BasicBlock {
 	private int startAddress;
 	private ArrayList<Capstone.CsInsn> addressList;
 	private int endAddress;
-	private ArrayList<Integer> addressReferences = new ArrayList<Integer>();
+	private HashSet<Integer> addressReferences = new HashSet<Integer>();
+	private HashSet<Integer> outOfScopeReferences = new HashSet<Integer>();
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
 
 	public BasicBlock() {
-		System.out.println("new block!");
 		addressList = new ArrayList<Capstone.CsInsn>();
 	}
 
@@ -32,6 +33,11 @@ public class BasicBlock {
 			System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
 		}
 		System.out.println("-------END-------");
+		System.out.print("references: ");
+		for (int reference:addressReferences) {
+			System.out.print(reference+"; ");
+		}
+		System.out.println();
 
 	}
 
@@ -41,6 +47,10 @@ public class BasicBlock {
 
 	public void addAddressReference(int reference) {
 		this.addressReferences.add(reference);
+	}
+
+	public void addAddressReferenceOutOfScope(int reference) {
+		this.outOfScopeReferences.add(reference);
 	}
 
 	public void addPtrReference(String reference) {

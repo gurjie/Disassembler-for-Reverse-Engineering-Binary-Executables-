@@ -1,0 +1,84 @@
+/*
+	 * public void disasm2(int address, ArrayList<CsInsn> instrList) { if
+	 * (this.knownAddresses.contains(address)) { System.out.println(address +
+	 * "was already disassembled, so what now?"); return; } do { Capstone.CsInsn
+	 * instruction; instruction = disasmInstructionAtAddress(address, data, entry,
+	 * textSize); System.out.printf("0x%x:\t%s\t%s\n",(int) instruction.address,
+	 * instruction.mnemonic, instruction.opStr); instrList.add(instruction); /*if
+	 * (isReturnInstruction(instruction)) { return current; } else if
+	 * (isUnconditionalCti(instruction)) { int destinationAddr =
+	 * getTargetAddress(instruction); if (destinationAddr != -1) { if
+	 * (destinationAddr < entry || destinationAddr > entry+textSize) { int
+	 * continueAddr = address + instruction.size; return current; } else {
+	 * current.addAddressReference(getTargetAddress(instruction)); return
+	 * disasm(getTargetAddress(instruction)); } } else {
+	 * current.addPtrReference(instruction.opStr); } }
+	 * 
+	 * if (isConditionalCti(instruction)||isUnconditionalCti(instruction)) {
+	 * ArrayList<Integer> possibleTargets = new ArrayList<Integer>(); int jumpAddr =
+	 * getTargetAddress(instruction); // determine CTI destination if (jumpAddr !=
+	 * -1) { // if dest can be reached possibleTargets.add(jumpAddr); // one target
+	 * to disassemble at } else { return; } //int continueAddr = address +
+	 * instruction.size; // diasm at enxt inst address
+	 * //possibleTargets.add(continueAddr); // add next address to possible target
+	 * for (int addr : possibleTargets) { // for all possible disassemble targets
+	 * /*if (this.knownAddresses.contains(addr)) { // if the address hasn't been
+	 * disasm already System.out.println(addr +" already disassembled"); continue;
+	 * // skip to the next disasm target } disasm2(addr, this.instrList); // disasm
+	 * at first address (recursive) } } else { // its not a CTI so disasm next
+	 * address += instruction.size; }
+	 * 
+	 * } while (address <= entry + textSize); }
+	 */
+	 
+	 
+	 	public BasicBlock disasm(int address) {
+		BasicBlock current = new BasicBlock();
+		if (this.possibleTargets.size() == 0) {
+			return current;
+		}
+		this.blockList.add(current);
+		do {
+			if (address == 9432) {
+			}
+			Capstone.CsInsn instruction;
+			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
+			// if(instruction == null) {
+			// break;
+			// }
+			if (instruction == null) {
+				break;
+			}
+			System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
+			current.addInstruction(instruction);
+
+			if (instruction.mnemonic.equals("ret")) {
+				return disasm(address + instruction.size);
+			}
+
+			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
+				int jumpAddr = getTargetAddress(instruction); // determine CTI destination
+				if (jumpAddr != -1) { // if dest can be reached
+					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
+						current.addAddressReference(jumpAddr); // ignore for now
+						possibleTargets.add(jumpAddr); // one target to disassemble at
+					} else {
+						address += instruction.size; // if its outside of scope of text disasm next
+						continue;
+
+					}
+				} else {
+					current.addPtrReference(instruction.opStr);
+				}
+				int continueAddr = address + instruction.size; // diasm at enxt inst address
+				possibleTargets.add(continueAddr); // add next address to possible target
+				current.addAddressReference(continueAddr); // ignore for now
+				int target = this.possibleTargets.get(0);
+				return disasm(this.possibleTargets.get(0));
+			} else { // its not a CTI so disasm next
+				address += instruction.size;
+			}
+
+		} while (address < entry + textSize);
+		return current;
+	}
