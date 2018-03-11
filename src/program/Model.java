@@ -3,7 +3,9 @@ package program;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 public class Model {
 
@@ -39,8 +41,12 @@ public class Model {
 		return this.instance.getFunctions();
 	}
 	
-	public ArrayList<BasicBlock> getBasicBlocks() {
+	public Map<Integer, BasicBlock> getBasicBlocks() {
 		return this.instance.getBasicBlocks();
+	}
+	
+	public HashSet<Integer> getAssociatedBlockAddresses(int functionAddr) {
+		return this.instance.getAssociatedAddresses(functionAddr);
 	}
 	
 }

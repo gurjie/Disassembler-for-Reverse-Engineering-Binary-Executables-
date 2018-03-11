@@ -7,9 +7,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import capstone.Capstone;
@@ -37,7 +41,7 @@ public class Disassemble {
 	private Capstone cs;
 
 	private Set<String> conditionalCtis = new HashSet<String>();
-	ArrayList<BasicBlock> blockList;
+	Map<Integer,BasicBlock> blockList;
 
 	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
 		try {
@@ -61,27 +65,66 @@ public class Disassemble {
 		buildConditionalCtis();
 		int main = setMain();
 		System.out.println(main);
-		this.blockList = new ArrayList<BasicBlock>();
+		this.blockList = new TreeMap<Integer,BasicBlock>();
 		this.possibleTargets.add(main);
 		disasm(main);
-		sortBlockList();
-		for (BasicBlock block : blockList) {
-			System.out.println(block.getFirst());
+		Iterator<BasicBlock> itr = this.blockList.values().iterator();
+
+		while (itr.hasNext()) {
+			BasicBlock current = itr.next();
+			// if its normal transfer instruction....
+			if(!isConditionalCti(current.getLastInstruction())&&!isUnconditionalCti(current.getLastInstruction())) {
+				   if(!isReturnInstruction(current.getLastInstruction())) {
+					   System.out.println(current.getLastInstruction().mnemonic);
+						Iterator<BasicBlock> itr2 = this.blockList.values().iterator();
+						while (itr2.hasNext()) { // Iterate over the blocks to find its origin...
+							BasicBlock potential = itr2.next();
+							if(potential.getFirstInstruction().address==current.getLastAddress()+current.getLastInstruction().size) {
+								//System.out.println("making link from "+current.getLastInstruction().address+" to "+potential.getFirstInstruction().address);
+								current.addLoopAddressReference(((int) potential.getFirstInstruction().address));
+							}
+						}
+				   }
+			}
 		}
+		
+		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
+		while (itr3.hasNext()) {
+			BasicBlock current = itr3.next();
+			System.out.println(current.instructionsToString());
+		}
+
+		
 	}
 	
-	public ArrayList<BasicBlock> getBasicBlocks() {
+	public HashSet<Integer> getAssociatedAddresses(int function) {
+		HashSet<Integer> blockAddresses = new HashSet<Integer>();	
+		getFunctionReferences(this.blockList.get(function),blockAddresses);
+		return blockAddresses;
+	}
+	
+	private void getFunctionReferences(BasicBlock block, HashSet<Integer> blockAddresses){  
+	    for (int x : block.getAddressReferenceList()) {
+	    	blockAddresses.add(x);
+	    	getFunctionReferences(this.blockList.get(x), blockAddresses);
+	    }
+	}
+	
+	/*
+	private int getAddressReferences(int address, List<Integer> addrList) {
+		if(this.blockList.get(address).getAddressReferenceList().size()==0) {
+			return 0;
+		} 
+		for (int addr : this.blockList.get(address).getAddressReferenceList()) {
+			int reference = getAddressReferences(addr,addrList);
+			return reference;
+		}
+	}*/
+	
+	public Map<Integer,BasicBlock> getBasicBlocks() {
 		return this.blockList;
 	}
-	
-	private void sortBlockList() {
-		Collections.sort(blockList, new Comparator<BasicBlock>() {
-			@Override
-			public int compare(BasicBlock o1, BasicBlock o2) {
-				return (o1.getFirst() - o2.getFirst());
-			}
-		});
-	}
+
 	
 	private int setMain() throws MainDiscoveryException {
 		if (this.symtabExists&&this.strtabExists) {
@@ -104,7 +147,7 @@ public class Disassemble {
 		for (int i = 0; i < this.possibleTargets.size(); i++) {
 			BasicBlock current = buildBlock(this.possibleTargets.get(i));
 			if(current.getBlockSize()!=0) {
-				this.blockList.add(current);
+				this.blockList.put(current.getFirstAddress(),current);
 			}
 		}
 	}
@@ -126,25 +169,30 @@ public class Disassemble {
 			}
 
 			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
+				// BEGIN DEALING WITH JUMP TARGET
 				int jumpAddr = getTargetAddress(instruction)-0x400000; // determine CTI destination
 				if (jumpAddr != -1) { // if dest can be reached
 					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
 						if (!this.knownAddresses.contains(jumpAddr)) {
 							this.possibleTargets.add(jumpAddr); // one target to disassemble at
-							current.addAddressReference(jumpAddr);
+							current.addAddressReference(jumpAddr+0x400000);
+						} else {
+							current.addAddressReference(jumpAddr+0x400000);
 						}
 					} else {
 						current.addAddressReferenceOutOfScope(jumpAddr);
-						address += instruction.size; // if its outside of scope of text disasm next
-						continue;
-
+						//current.addAddressReference(address+0x400000);
 					}
 				}
+				// END DEALIGN WITH JUMP TARGET, BEGIN DEALING WITH FALLTHROUGH
 				int continueAddr = address + instruction.size; // diasm at enxt inst address
-				if (!this.knownAddresses.contains(continueAddr)&&!instruction.mnemonic.equals("jmp")) {
+				if (!instruction.mnemonic.equals("jmp")) {
 					this.possibleTargets.add(continueAddr); // add next address to possible target
-					current.addAddressReference(continueAddr);
+					current.addAddressReference(continueAddr+0x400000);
+				} else {
+					current.addAddressReference(continueAddr+0x400000);
 				}
+				// END DEALING WITH FALLTHROUGH
 				return current;
 			} else { // its not a CTI so disasm next
 				address += instruction.size;
@@ -228,6 +276,7 @@ public class Disassemble {
 		}
 		return true;
 	}
+	
 
 	private boolean isReturnInstruction(Capstone.CsInsn instruction) {
 		if (!instruction.mnemonic.equals("ret")) {

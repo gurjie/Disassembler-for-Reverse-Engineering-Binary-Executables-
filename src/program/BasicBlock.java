@@ -12,33 +12,56 @@ public class BasicBlock {
 	private ArrayList<Capstone.CsInsn> addressList;
 	private int endAddress;
 	private HashSet<Integer> addressReferences = new HashSet<Integer>();
+	private HashSet<Integer> loopAddressReferences = new HashSet<Integer>();
 	private HashSet<Integer> outOfScopeReferences = new HashSet<Integer>();
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
 
 	public BasicBlock() {
 		addressList = new ArrayList<Capstone.CsInsn>();
 	}
-
+	
+	public ArrayList<Capstone.CsInsn> getInstructionList() {
+		return this.addressList;
+	}
+	
 	public int getBlockSize() {
 		return this.addressList.size();
 	}
 
-	public int getFirst() {
+	public int getFirstAddress() {
 		return (int) this.addressList.get(0).address;
 	}
+	
+	public int getLastAddress() {
+		return (int) this.addressList.get(this.addressList.size()-1).address;
+	}
+	
+	public Capstone.CsInsn getLastInstruction() {
+		return this.addressList.get(this.addressList.size()-1);
+	}
+	
+	public Capstone.CsInsn getFirstInstruction() {
+		return this.addressList.get(0);
+	}
+	
 
-	public void printInstructions() {
-		System.out.println("-------START-------");
+	public String instructionsToString() {
+		String instStr = "";
+		instStr = instStr.concat("-------START-------\n");
 		for (Capstone.CsInsn instruction : addressList) {
-			System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
+			instStr = instStr.concat(String.format("0x%x:\t%s\t %s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr));
+			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
 		}
-		System.out.println("-------END-------");
-		System.out.print("references: ");
+		instStr = instStr.concat("-------END-------\n");
+		instStr = instStr.concat("references: ");
 		for (int reference:addressReferences) {
-			System.out.print(reference+"; ");
+			instStr = instStr.concat((reference+"; "));
 		}
-		System.out.println();
-
+		for (int reference:loopAddressReferences) {
+			instStr = instStr.concat((reference+"; "));
+		}
+		instStr = instStr.concat("\n");
+		return instStr;
 	}
 
 	public void addInstruction(Capstone.CsInsn instruction) {
@@ -52,10 +75,26 @@ public class BasicBlock {
 	public void addAddressReferenceOutOfScope(int reference) {
 		this.outOfScopeReferences.add(reference);
 	}
+	
+	public void addLoopAddressReference(int reference) {
+		if (!this.addressReferences.contains(reference)) {
+			this.loopAddressReferences.add(reference);
+		}
+	}
 
 	public void addPtrReference(String reference) {
 		this.ptrReferences.add(reference);
 	}
+	
+	public HashSet<Integer> getAddressReferenceList() {
+		return this.addressReferences;
+	}
+	
+	public HashSet<Integer> getLoopAddressReferences() {
+		return this.loopAddressReferences;
+	}
+	
+
 	/**
 	 * public int getStartAddress() { // TODO Auto-generated method stub return
 	 * this.startAddress; }

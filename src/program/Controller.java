@@ -8,6 +8,10 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.imageio.ImageIO;
 import javax.swing.DefaultListCellRenderer;
@@ -18,10 +22,13 @@ import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
 import javax.swing.event.ListSelectionEvent;
 
+import com.mxgraph.layout.mxCompactTreeLayout;
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
+import com.mxgraph.model.mxCell;
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.util.mxCellRenderer;
+import com.mxgraph.util.mxConstants;
 import com.mxgraph.view.mxGraph;
 
 public class Controller {
@@ -54,7 +61,6 @@ public class Controller {
 		view.getFrame().getContentPane().add(view.getEncompassingPane(), BorderLayout.CENTER);
 		view.getFunctionsPane().setOrientation(JSplitPane.VERTICAL_SPLIT);
 		view.getEncompassingPane().setLeftComponent(view.getFunctionsPane());
-		// view.getSectionsPanel().setBackground(Color.LIGHT_GRAY);
 		view.getSectionsList().setVisibleRowCount(14);
 		view.getSectionsScrollPane().setViewportView(view.getSectionsList());
 		view.getSectionsScrollPane().setColumnHeaderView(view.getLblSections());
@@ -109,11 +115,12 @@ public class Controller {
 		            // Double-click detected
 		            int index = list.locationToIndex(evt.getPoint());
 		            selectedFunction = view.getFunctionList().getSelectedValue();
-		            System.out.println(selectedFunction.getName());
+		            showCFG(selectedFunction);
 		        } 
 		    }
 		});
 	}
+	
 
 	
 	private void graphScroll() {
@@ -223,6 +230,112 @@ public class Controller {
 		}
 	}
 
+	
+	private void showCFG(Function f) {
+		view.getGraphPane().removeAll();
+		this.graph = new mxGraph();
+		Object parent = graph.getDefaultParent();
+		graph.getModel().beginUpdate();
+		try {
+			f.setAssociatedAddresses(this.model.getAssociatedBlockAddresses(f.getStartAddr()));
+			// store a mapping of basic blocks to vertices
+			Map<BasicBlock, Object> blockToVertex = new LinkedHashMap<BasicBlock, Object>();
+			BasicBlock first = this.model.getBasicBlocks().get(f.getStartAddr());
+		    Object root = graph.insertVertex(
+		    graph.getDefaultParent(), null, first.instructionsToString(), 240, 150, 80, 30);
+		    blockToVertex.put(first, root);	
+			graph.updateCellSize(root);
+			for (int addr : f.getAssociatedAddresses()) {
+				BasicBlock block = this.model.getBasicBlocks().get(addr);
+			    Object vertex = graph.insertVertex(
+			    graph.getDefaultParent(), null, block.instructionsToString(), 240, 150, 80, 30);
+			    blockToVertex.put(block, vertex);	
+				graph.updateCellSize(vertex);
+			}
+			
+			// for every basic block connect its reference addresses
+			for (int i : f.getAssociatedAddresses()) {
+			    BasicBlock block0 = this.model.getBasicBlocks().get(i);
+			    Object vertex0 = blockToVertex.get(block0);
+			    for (int x : block0.getAddressReferenceList()) {
+				    BasicBlock block1 = this.model.getBasicBlocks().get(x);
+				    Object vertex1 = blockToVertex.get(block1);
+				    Object e1 = graph.insertEdge(
+					        graph.getDefaultParent(), null, "", vertex0, vertex1);
+			    }
+			    
+			    for (int x : block0.getLoopAddressReferences()) {
+				    BasicBlock block1 = this.model.getBasicBlocks().get(x);
+				    Object vertex1 = blockToVertex.get(block1);
+				    Object e1 = graph.insertEdge(
+					        graph.getDefaultParent(), null, "", vertex0, vertex1);
+			    }
+			    
+			    
+
+			}  
+			
+			for (int i : first.getAddressReferenceList()) {
+			    Object vertex0 = blockToVertex.get(first);
+			    for (int x : first.getAddressReferenceList()) {
+				    BasicBlock block1 = this.model.getBasicBlocks().get(x);
+				    Object vertex1 = blockToVertex.get(block1);
+				    Object e1 = graph.insertEdge(
+					        graph.getDefaultParent(), null, "", vertex0, vertex1);
+			    }
+
+			}  
+			
+			// Some basic blocks can loop, pointing to themselves. Connect these also
+			// (loopAddressReferences store these)
+			
+			
+			
+			//addConnection(graph,f.getStartAddr());			
+			/*
+			mxCell cell = new mxCell();
+			Object v1 = graph.insertVertex(parent, null, model.getBasicBlocks().get((int) f.getStartAddr()).instructionsToString(), 20, 20, 80, 30);
+			Object v2 = graph.insertVertex(parent, null,
+					"Worl\nfaelijafijldgajil\nfailaf\nfkaafs\nfakjnfask\nfajkfsfas!", 240, 150, 80, 30);
+			Object v3 = graph.insertVertex(parent, null,
+					"Worl\nfaelijafijldgajil\nfailaf\nfkaafs\nfakjnfask\nfajkfsfas!", 320, 180, 80, 30);
+			Object v4 = graph.insertVertex(parent, null, "1", 370, 250, 80, 30);
+
+			graph.updateCellSize(v2);
+			graph.insertEdge(parent, null, "", v1, v2);
+			graph.insertEdge(parent, null, "", v2, v3);
+			*/
+
+			graph.setCellsResizable(true);
+			graph.setCellsDisconnectable(false);
+			graph.setEdgeLabelsMovable(false);
+			graph.alignCells(mxConstants.ALIGN_RIGHT);
+
+			System.out.println("built!");
+		} finally {
+			graph.getModel().endUpdate();
+		}
+		mxGraphComponent graphComponent = new mxGraphComponent(graph);
+		graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
+			public void mouseReleased(MouseEvent e) {
+				Object cell = graphComponent.getCellAt(e.getX(), e.getY());
+				if (cell != null) {
+
+					System.out.println(graph.getLabel(cell));
+				}
+			}
+		});
+		mxIGraphLayout layout = new mxHierarchicalLayout(graph);
+		layout.execute(graph.getDefaultParent());
+		// graph.groupCells();
+		graph.setCellsEditable(false);
+		graphComponent.setConnectable(false);
+		view.getGraphPane().setLayout(new BorderLayout());
+		view.getGraphPane().add(graphComponent, BorderLayout.CENTER);
+		view.getGraphPane().validate();
+		initZoomListeners(graphComponent);
+	}
+	
 	private void openCFG() {
 		view.getGraphPane().removeAll();
 		// initialise the control flow graph shower

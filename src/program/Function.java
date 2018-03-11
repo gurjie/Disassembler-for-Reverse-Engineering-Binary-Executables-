@@ -1,9 +1,12 @@
 package program;
 
+import java.util.HashSet;
+
 public class Function {
 	private long startAddr;
 	private long endAddr; 
 	private String name;
+	private HashSet<Integer> associatedAddresses;	
 	
 	public Function(String name) {
 		this.name = name;
@@ -21,12 +24,20 @@ public class Function {
 		this.endAddr = end;
 	}
 	
-	public long getStartAddr() {
-		return this.startAddr;
+	public int getStartAddr() {
+		return (int) this.startAddr;
 	}
 	
-	public long getEndAddr() {
-		return this.endAddr;
+	public int getEndAddr() {
+		return (int) this.endAddr;
+	}
+	
+	public void setAssociatedAddresses(HashSet<Integer> associated) {
+		this.associatedAddresses = associated;
+	}
+	
+	public HashSet<Integer> getAssociatedAddresses() {
+		return this.associatedAddresses;
 	}
 	
 	@Override
