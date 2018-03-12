@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.imageio.ImageIO;
 import javax.swing.DefaultListCellRenderer;
@@ -230,6 +231,24 @@ public class Controller {
 		}
 	}
 
+	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
+	    Map.Entry<Integer, BasicBlock> previousEntry = null;
+	    for (Entry<Integer, BasicBlock> e : map.entrySet()) {
+	        if (e.getKey().compareTo(value) >= 0) {
+	            if (previousEntry == null) {
+	                return e.getValue();
+	            } else {
+	                if (e.getKey() - value >= value - previousEntry.getKey()) {
+	                    return previousEntry.getValue();
+	                } else {
+	                    return e.getValue();
+	                }
+	            }
+	        }
+	        previousEntry = e;
+	    }
+	    return previousEntry.getValue();
+	}
 	
 	private void showCFG(Function f) {
 		view.getGraphPane().removeAll();
@@ -240,32 +259,35 @@ public class Controller {
 			f.setAssociatedAddresses(this.model.getAssociatedBlockAddresses(f.getStartAddr()));
 			// store a mapping of basic blocks to vertices
 			Map<BasicBlock, Object> blockToVertex = new LinkedHashMap<BasicBlock, Object>();
-			BasicBlock first = this.model.getBasicBlocks().get(f.getStartAddr());
+			BasicBlock first = findNearest(this.model.getBasicBlocks(),f.getStartAddr());
 		    Object root = graph.insertVertex(
 		    graph.getDefaultParent(), null, first.instructionsToString(), 240, 150, 80, 30);
 		    blockToVertex.put(first, root);	
 			graph.updateCellSize(root);
 			for (int addr : f.getAssociatedAddresses()) {
-				BasicBlock block = this.model.getBasicBlocks().get(addr);
-			    Object vertex = graph.insertVertex(
-			    graph.getDefaultParent(), null, block.instructionsToString(), 240, 150, 80, 30);
-			    blockToVertex.put(block, vertex);	
-				graph.updateCellSize(vertex);
+				if (!(findNearest(this.model.getBasicBlocks(),addr).getFirstAddress()<f.getStartAddr())&&
+						!(findNearest(this.model.getBasicBlocks(),addr).getLastAddress()>f.getEndAddr())) {
+					BasicBlock block = findNearest(this.model.getBasicBlocks(),addr);
+				    Object vertex = graph.insertVertex(
+				    graph.getDefaultParent(), null, block.instructionsToString(), 240, 150, 80, 30);
+				    blockToVertex.put(block, vertex);	
+					graph.updateCellSize(vertex);	
+				}
 			}
 			
 			// for every basic block connect its reference addresses
 			for (int i : f.getAssociatedAddresses()) {
-			    BasicBlock block0 = this.model.getBasicBlocks().get(i);
+			    BasicBlock block0 = findNearest(this.model.getBasicBlocks(),i);
 			    Object vertex0 = blockToVertex.get(block0);
 			    for (int x : block0.getAddressReferenceList()) {
-				    BasicBlock block1 = this.model.getBasicBlocks().get(x);
+				    BasicBlock block1 = findNearest(this.model.getBasicBlocks(),x);;
 				    Object vertex1 = blockToVertex.get(block1);
 				    Object e1 = graph.insertEdge(
 					        graph.getDefaultParent(), null, "", vertex0, vertex1);
 			    }
 			    
 			    for (int x : block0.getLoopAddressReferences()) {
-				    BasicBlock block1 = this.model.getBasicBlocks().get(x);
+				    BasicBlock block1 = findNearest(this.model.getBasicBlocks(),x);
 				    Object vertex1 = blockToVertex.get(block1);
 				    Object e1 = graph.insertEdge(
 					        graph.getDefaultParent(), null, "", vertex0, vertex1);
@@ -334,6 +356,7 @@ public class Controller {
 		view.getGraphPane().add(graphComponent, BorderLayout.CENTER);
 		view.getGraphPane().validate();
 		initZoomListeners(graphComponent);
+		graphComponent.validate();
 	}
 	
 	private void openCFG() {

@@ -9,7 +9,7 @@ import capstone.Capstone.CsInsn;
 
 public class BasicBlock {
 	private int startAddress;
-	private ArrayList<Capstone.CsInsn> addressList;
+	private ArrayList<Capstone.CsInsn> instructionList;
 	private int endAddress;
 	private HashSet<Integer> addressReferences = new HashSet<Integer>();
 	private HashSet<Integer> loopAddressReferences = new HashSet<Integer>();
@@ -17,38 +17,38 @@ public class BasicBlock {
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
 
 	public BasicBlock() {
-		addressList = new ArrayList<Capstone.CsInsn>();
+		instructionList = new ArrayList<Capstone.CsInsn>();
 	}
 	
 	public ArrayList<Capstone.CsInsn> getInstructionList() {
-		return this.addressList;
+		return this.instructionList;
 	}
 	
 	public int getBlockSize() {
-		return this.addressList.size();
+		return this.instructionList.size();
 	}
 
 	public int getFirstAddress() {
-		return (int) this.addressList.get(0).address;
+		return (int) this.instructionList.get(0).address;
 	}
 	
 	public int getLastAddress() {
-		return (int) this.addressList.get(this.addressList.size()-1).address;
+		return (int) this.instructionList.get(this.instructionList.size()-1).address;
 	}
 	
 	public Capstone.CsInsn getLastInstruction() {
-		return this.addressList.get(this.addressList.size()-1);
+		return this.instructionList.get(this.instructionList.size()-1);
 	}
 	
 	public Capstone.CsInsn getFirstInstruction() {
-		return this.addressList.get(0);
+		return this.instructionList.get(0);
 	}
 	
 
 	public String instructionsToString() {
 		String instStr = "";
 		instStr = instStr.concat("-------START-------\n");
-		for (Capstone.CsInsn instruction : addressList) {
+		for (Capstone.CsInsn instruction : instructionList) {
 			instStr = instStr.concat(String.format("0x%x:\t%s\t %s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr));
 			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
 		}
@@ -65,7 +65,7 @@ public class BasicBlock {
 	}
 
 	public void addInstruction(Capstone.CsInsn instruction) {
-		this.addressList.add(instruction);
+		this.instructionList.add(instruction);
 	}
 
 	public void addAddressReference(int reference) {
@@ -94,6 +94,9 @@ public class BasicBlock {
 		return this.loopAddressReferences;
 	}
 	
+	public boolean isEmpty() {
+		return this.instructionList.isEmpty();
+	}
 
 	/**
 	 * public int getStartAddress() { // TODO Auto-generated method stub return
