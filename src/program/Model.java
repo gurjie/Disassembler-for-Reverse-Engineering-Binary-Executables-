@@ -45,8 +45,8 @@ public class Model {
 		return this.instance.getBasicBlocks();
 	}
 	
-	public HashSet<Integer> getAssociatedBlockAddresses(int functionAddr) {
-		return this.instance.getAssociatedAddresses(functionAddr);
-	}
+	//public HashSet<Integer> getAssociatedBlockAddresses(int functionAddr) {
+	//	return this.instance.getAssociatedAddresses(functionAddr);
+	//}
 	
 }

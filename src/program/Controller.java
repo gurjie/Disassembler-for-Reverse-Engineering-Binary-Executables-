@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,6 +32,7 @@ import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.util.mxCellRenderer;
 import com.mxgraph.util.mxConstants;
 import com.mxgraph.view.mxGraph;
+import com.mxgraph.view.mxStylesheet;
 
 public class Controller {
 
@@ -93,7 +95,7 @@ public class Controller {
 			loadFile();
 		});
 		view.getExportButton().addActionListener(e -> export());
-		view.getCfgButton().addActionListener(e -> openCFG());
+		// view.getCfgButton().addActionListener(e -> openCFG());
 		// view.getLastnameSaveButton().addActionListener(e -> saveLastname());
 		// view.getHello().addActionListener(e -> sayHello());
 		// view.getBye().addActionListener(e -> sayBye());
@@ -109,21 +111,19 @@ public class Controller {
 
 	public void initFunctionsListener() {
 		view.getFunctionList().addMouseListener(new MouseAdapter() {
-		    public void mouseClicked(MouseEvent evt) {
-		        JList list = (JList)evt.getSource();
-		        if (evt.getClickCount() == 2) {
-		        	
-		            // Double-click detected
-		            int index = list.locationToIndex(evt.getPoint());
-		            selectedFunction = view.getFunctionList().getSelectedValue();
-		            showCFG(selectedFunction);
-		        } 
-		    }
+			public void mouseClicked(MouseEvent evt) {
+				JList list = (JList) evt.getSource();
+				if (evt.getClickCount() == 2) {
+
+					// Double-click detected
+					int index = list.locationToIndex(evt.getPoint());
+					selectedFunction = view.getFunctionList().getSelectedValue();
+					showCFG(selectedFunction);
+				}
+			}
 		});
 	}
-	
 
-	
 	private void graphScroll() {
 		System.out.println("Scrolled");
 	}
@@ -143,36 +143,37 @@ public class Controller {
 					view.getSectionModel().addElement(s.getName());
 				}
 				if (!this.model.symTabExists()) {
-					JOptionPane.showMessageDialog(
-							new JFrame(), "The symbol table could not be "
-									+ "resolved. As a result, function names cannot be " + "displayed!",
+					JOptionPane.showMessageDialog(new JFrame(), "The symbol table could not be "
+							+ "resolved. As a result, function names have been resolved by function prologue discovery.",
 							"Warning", JOptionPane.WARNING_MESSAGE);
 				} else {
 					for (Function func : this.model.getFunctions()) {
 						view.getFunctionModel().addElement(func);
-		                view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
+						view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
 
-		                     @Override
-		                     public Component getListCellRendererComponent(JList list, Object value, int index,
-		                               boolean isSelected, boolean cellHasFocus) {
-		                          Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-		                          if (value instanceof Function) {
-		                               Function function = (Function) value;
-		                               setText(function.getName());
-		                               if (function.getStartAddr()==0) {
-		                                    setForeground(Color.RED);
-		                               } else {
-		                                    setForeground(Color.BLUE);
-		                               }
-		                          } else {
-		                               // do nothing
-		                          }
-		                          return c;
-		                     }
+							@Override
+							public Component getListCellRendererComponent(JList list, Object value, int index,
+									boolean isSelected, boolean cellHasFocus) {
+								Component c = super.getListCellRendererComponent(list, value, index, isSelected,
+										cellHasFocus);
+								if (value instanceof Function) {
+									Function function = (Function) value;
+									setText(function.getName());
+									if (function.getStartAddr() == 0) {
+										setForeground(Color.RED);
+									} else {
+										setForeground(Color.BLUE);
+									}
+								} else {
+									// do nothing
+								}
+								return c;
+							}
 
-		                });
+						});
+
+						initFunctionsListener();
 					}
-					initFunctionsListener();
 				}
 
 			} catch (ReadException e) {
@@ -180,7 +181,8 @@ public class Controller {
 			} catch (ElfException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Not an ELF", JOptionPane.ERROR_MESSAGE);
 			} catch (MainDiscoveryException e) {
-				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Couldn't find main()", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Couldn't find main()",
+						JOptionPane.ERROR_MESSAGE);
 				e.printStackTrace();
 			}
 		}
@@ -232,108 +234,85 @@ public class Controller {
 	}
 
 	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
-	    Map.Entry<Integer, BasicBlock> previousEntry = null;
-	    for (Entry<Integer, BasicBlock> e : map.entrySet()) {
-	        if (e.getKey().compareTo(value) >= 0) {
-	            if (previousEntry == null) {
-	                return e.getValue();
-	            } else {
-	                if (e.getKey() - value >= value - previousEntry.getKey()) {
-	                    return previousEntry.getValue();
-	                } else {
-	                    return e.getValue();
-	                }
-	            }
-	        }
-	        previousEntry = e;
-	    }
-	    return previousEntry.getValue();
+		Map.Entry<Integer, BasicBlock> previousEntry = null;
+		for (Entry<Integer, BasicBlock> e : map.entrySet()) {
+			if (e.getKey().compareTo(value) >= 0) {
+				if (previousEntry == null) {
+					return e.getValue();
+				} else {
+					if (e.getKey() - value >= value - previousEntry.getKey()) {
+						return previousEntry.getValue();
+					} else {
+						return e.getValue();
+					}
+				}
+			}
+			previousEntry = e;
+		}
+		return previousEntry.getValue();
 	}
-	
+
 	private void showCFG(Function f) {
 		view.getGraphPane().removeAll();
 		this.graph = new mxGraph();
 		Object parent = graph.getDefaultParent();
 		graph.getModel().beginUpdate();
 		try {
-			f.setAssociatedAddresses(this.model.getAssociatedBlockAddresses(f.getStartAddr()));
+			f.setAssociatedAddresses(this.model.getBasicBlocks());
 			// store a mapping of basic blocks to vertices
 			Map<BasicBlock, Object> blockToVertex = new LinkedHashMap<BasicBlock, Object>();
-			BasicBlock first = findNearest(this.model.getBasicBlocks(),f.getStartAddr());
-		    Object root = graph.insertVertex(
-		    graph.getDefaultParent(), null, first.instructionsToString(), 240, 150, 80, 30);
-		    blockToVertex.put(first, root);	
+			BasicBlock first = findNearest(this.model.getBasicBlocks(), f.getStartAddr());
+			Object root = graph.insertVertex(graph.getDefaultParent(), null, first.instructionsToString(), 240, 150, 80,
+					30);
+			blockToVertex.put(first, root);
 			graph.updateCellSize(root);
 			for (int addr : f.getAssociatedAddresses()) {
-				if (!(findNearest(this.model.getBasicBlocks(),addr).getFirstAddress()<f.getStartAddr())&&
-						!(findNearest(this.model.getBasicBlocks(),addr).getLastAddress()>f.getEndAddr())) {
-					BasicBlock block = findNearest(this.model.getBasicBlocks(),addr);
-				    Object vertex = graph.insertVertex(
-				    graph.getDefaultParent(), null, block.instructionsToString(), 240, 150, 80, 30);
-				    blockToVertex.put(block, vertex);	
-					graph.updateCellSize(vertex);	
+				//for(int k:f.getAssociatedAddresses()) {
+				//	System.out.println(f.getStartAddr()+" associated with: "+k);
+				//}
+				if (!(findNearest(this.model.getBasicBlocks(), addr).getFirstAddress() < f.getStartAddr())
+						&& !(findNearest(this.model.getBasicBlocks(), addr).getLastAddress() > f.getEndAddr())) {
+					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
+					Object vertex = graph.insertVertex(graph.getDefaultParent(), null, block.instructionsToString(),
+							240, 150, 80, 30);
+					blockToVertex.put(block, vertex);
+					graph.updateCellSize(vertex);
 				}
 			}
-			
+
 			// for every basic block connect its reference addresses
 			for (int i : f.getAssociatedAddresses()) {
-			    BasicBlock block0 = findNearest(this.model.getBasicBlocks(),i);
-			    Object vertex0 = blockToVertex.get(block0);
-			    for (int x : block0.getAddressReferenceList()) {
-				    BasicBlock block1 = findNearest(this.model.getBasicBlocks(),x);;
-				    Object vertex1 = blockToVertex.get(block1);
-				    Object e1 = graph.insertEdge(
-					        graph.getDefaultParent(), null, "", vertex0, vertex1);
-			    }
-			    
-			    for (int x : block0.getLoopAddressReferences()) {
-				    BasicBlock block1 = findNearest(this.model.getBasicBlocks(),x);
-				    Object vertex1 = blockToVertex.get(block1);
-				    Object e1 = graph.insertEdge(
-					        graph.getDefaultParent(), null, "", vertex0, vertex1);
-			    }
-			    
-			    
+				BasicBlock block0 = findNearest(this.model.getBasicBlocks(), i);
+				Object vertex0 = blockToVertex.get(block0);
+				for (int x : block0.getAddressReferenceList()) {
+					BasicBlock block1 = findNearest(this.model.getBasicBlocks(), x);
+					;
+					Object vertex1 = blockToVertex.get(block1);
+					Object e1 = graph.insertEdge(graph.getDefaultParent(), null, "", vertex0, vertex1);
+				}
 
-			}  
-			
-			for (int i : first.getAddressReferenceList()) {
-			    Object vertex0 = blockToVertex.get(first);
-			    for (int x : first.getAddressReferenceList()) {
-				    BasicBlock block1 = this.model.getBasicBlocks().get(x);
-				    Object vertex1 = blockToVertex.get(block1);
-				    Object e1 = graph.insertEdge(
-					        graph.getDefaultParent(), null, "", vertex0, vertex1);
-			    }
+				for (int x : block0.getLoopAddressReferences()) {
+					BasicBlock block1 = findNearest(this.model.getBasicBlocks(), x);
+					Object vertex1 = blockToVertex.get(block1);
+					Object e1 = graph.insertEdge(graph.getDefaultParent(), null, "", vertex0, vertex1);
+				}
 
-			}  
-			
-			// Some basic blocks can loop, pointing to themselves. Connect these also
-			// (loopAddressReferences store these)
-			
-			
-			
-			//addConnection(graph,f.getStartAddr());			
-			/*
-			mxCell cell = new mxCell();
-			Object v1 = graph.insertVertex(parent, null, model.getBasicBlocks().get((int) f.getStartAddr()).instructionsToString(), 20, 20, 80, 30);
-			Object v2 = graph.insertVertex(parent, null,
-					"Worl\nfaelijafijldgajil\nfailaf\nfkaafs\nfakjnfask\nfajkfsfas!", 240, 150, 80, 30);
-			Object v3 = graph.insertVertex(parent, null,
-					"Worl\nfaelijafijldgajil\nfailaf\nfkaafs\nfakjnfask\nfajkfsfas!", 320, 180, 80, 30);
-			Object v4 = graph.insertVertex(parent, null, "1", 370, 250, 80, 30);
+			}
 
-			graph.updateCellSize(v2);
-			graph.insertEdge(parent, null, "", v1, v2);
-			graph.insertEdge(parent, null, "", v2, v3);
-			*/
+			Object vertex0 = blockToVertex.get(first);
+			for (int x : first.getAddressReferenceList()) {
+				BasicBlock block1 = this.model.getBasicBlocks().get(x);
+				Object vertex1 = blockToVertex.get(block1);
+				//System.out.println("added");
+				Object e1 = graph.insertEdge(graph.getDefaultParent(), null, "", vertex0, vertex1);
+			}
 
 			graph.setCellsResizable(true);
 			graph.setCellsDisconnectable(false);
 			graph.setEdgeLabelsMovable(false);
 			graph.alignCells(mxConstants.ALIGN_RIGHT);
 
-			System.out.println("built!");
+			// System.out.println("built!");
 		} finally {
 			graph.getModel().endUpdate();
 		}
@@ -358,80 +337,6 @@ public class Controller {
 		initZoomListeners(graphComponent);
 		graphComponent.validate();
 	}
-	
-	private void openCFG() {
-		view.getGraphPane().removeAll();
-		// initialise the control flow graph shower
-		// start the popup CFG with model.showCfg as input, which returns a string
-		this.graph = new mxGraph();
-
-		Object parent = graph.getDefaultParent();
-		graph.getModel().beginUpdate();
-		try {
-			Object v1 = graph.insertVertex(parent, null, "asflfsaljiasflij\nflifjliadg", 20, 20, 80, 30);
-			Object v2 = graph.insertVertex(parent, null,
-					"Worl\nfaelijafijldgajil\nfailaf\nfkaafs\nfakjnfask\nfajkfsfas!", 240, 150, 80, 30);
-			Object v3 = graph.insertVertex(parent, null,
-					"Worl\nfaelijafijldgajil\nfailaf\nfkaafs\nfakjnfask\nfajkfsfas!", 320, 180, 80, 30);
-			Object v4 = graph.insertVertex(parent, null, "1", 370, 250, 80, 30);
-			Object v5 = graph.insertVertex(parent, null, "2", 370, 250, 80, 30);
-			Object v6 = graph.insertVertex(parent, null, "3", 370, 250, 80, 30);
-			Object v7 = graph.insertVertex(parent, null, "4", 370, 250, 80, 30);
-			Object v8 = graph.insertVertex(parent, null, "5", 370, 250, 80, 30);
-			Object v9 = graph.insertVertex(parent, null, "6", 370, 250, 80, 30);
-			Object v10 = graph.insertVertex(parent, null, "7", 370, 250, 80, 30);
-			Object v11 = graph.insertVertex(parent, null, "5", 370, 250, 80, 30);
-			Object v12 = graph.insertVertex(parent, null, "6", 370, 250, 80, 30);
-			Object v13 = graph.insertVertex(parent, null, "7", 370, 250, 80, 30);
-			Object v14 = graph.insertVertex(parent, null, "5", 370, 250, 80, 30);
-			Object v15 = graph.insertVertex(parent, null, "6", 370, 250, 80, 30);
-			Object v16 = graph.insertVertex(parent, null, "7", 370, 250, 80, 30);
-			Object v17 = graph.insertVertex(parent, null, "5", 370, 250, 80, 30);
-			Object v18 = graph.insertVertex(parent, null, "6", 370, 250, 80, 30);
-			Object v19 = graph.insertVertex(parent, null, "7", 370, 250, 80, 30);
-
-			graph.setCellsResizable(true);
-			graph.updateCellSize(v2);
-			graph.insertEdge(parent, null, "", v1, v2);
-			graph.insertEdge(parent, null, "", v2, v3);
-			graph.insertEdge(parent, null, "", v1, v4);
-			graph.insertEdge(parent, null, "", v8, v5);
-			graph.insertEdge(parent, null, "", v5, v6);
-			graph.insertEdge(parent, null, "", v7, v1);
-			graph.insertEdge(parent, null, "", v9, v1);
-			graph.insertEdge(parent, null, "", v1, v7);
-			graph.insertEdge(parent, null, "", v4, v1);
-			graph.insertEdge(parent, null, "", v7, v8);
-			graph.insertEdge(parent, null, "", v1, v9);
-			graph.insertEdge(parent, null, "", v4, v10);
-
-			graph.setCellsDisconnectable(false);
-			graph.setEdgeLabelsMovable(false);
-
-			System.out.println("built!");
-		} finally {
-			graph.getModel().endUpdate();
-		}
-		mxGraphComponent graphComponent = new mxGraphComponent(graph);
-		graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
-			public void mouseReleased(MouseEvent e) {
-				Object cell = graphComponent.getCellAt(e.getX(), e.getY());
-				if (cell != null) {
-
-					System.out.println("cell=" + graph.getLabel(cell));
-				}
-			}
-		});
-		mxIGraphLayout layout = new mxHierarchicalLayout(graph);
-		layout.execute(graph.getDefaultParent());
-		// graph.groupCells();
-		graph.setCellsEditable(false);
-		graphComponent.setConnectable(false);
-		view.getGraphPane().setLayout(new BorderLayout());
-		view.getGraphPane().add(graphComponent, BorderLayout.CENTER);
-		view.getGraphPane().validate();
-		initZoomListeners(graphComponent);
-	}
 
 	private void zoomIn(mxGraphComponent graphComponent) {
 		graphComponent.zoomIn();
@@ -442,18 +347,5 @@ public class Controller {
 		graphComponent.zoomOut();
 		graphComponent.validate();
 	}
-
-	/*
-	 * private void saveLastname() {
-	 * model.setLastname(view.getLastnameTextfield().getText());
-	 * JOptionPane.showMessageDialog(null, "Lastname saved : " +
-	 * model.getLastname(), "Info", JOptionPane.INFORMATION_MESSAGE); }
-	 * 
-	 * private void sayHello() { JOptionPane.showMessageDialog(null, "Hello " +
-	 * model.getFirstname() + " " + model.getLastname(), "Info",
-	 * JOptionPane.INFORMATION_MESSAGE); }
-	 * 
-	 * private void sayBye() { System.exit(0); }
-	 */
 
 }

@@ -38,11 +38,14 @@ public class Disassemble {
 	private ArrayList<Function> functions = new ArrayList<Function>();
 	private ArrayList<Long> symbolAddresses = new ArrayList<Long>(); // Holds addresses of symbols read
 	private ArrayList<SymbolEntry> symbolEntries = new ArrayList<SymbolEntry>(); // Symbol table entries
+	private HashSet<Integer> midBlockTargets = new HashSet<Integer>();
+
+
 
 	private Capstone cs;
 
 	private Set<String> conditionalCtis = new HashSet<String>();
-	Map<Integer,BasicBlock> blockList;
+	private Map<Integer,BasicBlock> blockList;
 
 	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
 		try {
@@ -62,15 +65,63 @@ public class Disassemble {
 		this.cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
 
 		setSections();
-		resolveSymbols();
+		resolveSymbols(); // this only executes if function exists
 		buildConditionalCtis();
 		int main = setMain();
 		System.out.println(main);
 		this.blockList = new TreeMap<Integer,BasicBlock>();
 		this.possibleTargets.add(main);
 		disasm(main);
-		Iterator<BasicBlock> itr = this.blockList.values().iterator();
+		
+		Map<Integer,BasicBlock> splitBlockList = new TreeMap<Integer,BasicBlock>();;
 
+		for(int x: this.midBlockTargets) {
+			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
+			while (itr4.hasNext()) {
+				BasicBlock temp = itr4.next();
+				if(temp.containsAddress(x+0x400000)) {
+					HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
+					HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
+					initialLoopReferences.addAll(temp.getLoopAddressReferences());
+					initialAddrReferences.addAll(temp.getAddressReferenceList());
+					// Split the blocks instructions into two lists to assign to new blocks
+					ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(temp.getInstructionList().subList(0, temp.indexOfAddress(x+0x400000)));
+					ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(temp.getInstructionList().subList(temp.indexOfAddress(x+0x400000), temp.getInstructionList().size()));
+					//System.out.println(Long.toHexString(x)+" block found::::: ");
+					//System.out.print(temp.instructionsToString());
+					//System.out.println("first list: ");
+					//for(Capstone.CsInsn i:initialInsns) {
+						//System.out.println(i.mnemonic+"   "+i.opStr);
+					//}
+					//System.out.println("jump list: ");
+					//for(Capstone.CsInsn i:targetList) {
+						//System.out.println(i.mnemonic+"   "+i.opStr);
+					//}
+					//System.out.println();
+					// Reset original lists' references and instructions, overwriting with initialInsn
+					// and adding reference to the first address of the new list...
+					this.blockList.get(temp.getFirstAddress()).overwriteInstructions(initialInsns, (int) targetList.get(0).address);
+					//System.out.println(this.blockList.get(temp.getFirstAddress()).instructionsToString());
+					BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after split
+					jumpBlock.setInstructionList(targetList);
+					jumpBlock.setReferences(initialAddrReferences);
+					jumpBlock.setLoopReferences(initialLoopReferences);
+					splitBlockList.put(jumpBlock.getFirstAddress(), jumpBlock);
+					//System.out.println(jumpBlock.instructionsToString());
+
+				}
+			}
+		}
+		
+		Iterator<BasicBlock> splitBlockIt = splitBlockList.values().iterator();
+		while (splitBlockIt.hasNext()) {
+			BasicBlock current = splitBlockIt.next();
+			this.blockList.put(current.getFirstAddress(), current);
+			//System.out.println("/x//////"+current.instructionsToString());
+		}
+		
+		
+		Iterator<BasicBlock> itr = this.blockList.values().iterator();
 		while (itr.hasNext()) {
 			BasicBlock current = itr.next();
 			// if its normal transfer instruction....
@@ -91,10 +142,72 @@ public class Disassemble {
 		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
 		while (itr3.hasNext()) {
 			BasicBlock current = itr3.next();
-			System.out.println(current.instructionsToString());
+			//System.out.println(current.instructionsToString());
 		}
+		/*
+		for(int x: this.midBlockTargets) {
+			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
+			while (itr4.hasNext()) {
+				BasicBlock temp = itr4.next();
+				if(temp.containsAddress(x+0x400000)) {
+					HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
+					HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
+					initialLoopReferences.addAll(temp.getLoopAddressReferences());
+					initialAddrReferences.addAll(temp.getAddressReferenceList());
+					for(int i:initialAddrReferences) {
+						System.out.println(Integer.toHexString(i-0x400000));
+					}
+					// Split the blocks instructions into two lists to assign to new blocks
+					ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(temp.getInstructionList().subList(0, temp.indexOfAddress(x+0x400000)));
+					ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(temp.getInstructionList().subList(temp.indexOfAddress(x+0x400000), temp.getInstructionList().size()));
+					System.out.println(Long.toHexString(x)+" block found::::: ");
+					System.out.print(temp.instructionsToString());
+					System.out.println("first list: ");
+					for(Capstone.CsInsn i:initialInsns) {
+						System.out.println(i.mnemonic+"   "+i.opStr);
+					}
+					System.out.println("jump list: ");
+					for(Capstone.CsInsn i:targetList) {
+						System.out.println(i.mnemonic+"   "+i.opStr);
+					}
+					System.out.println();
+					// Reset original lists' references and instructions, overwriting with initialInsn
+					// and adding reference to the first address of the new list...
+					this.blockList.get(temp.getFirstAddress()).overwriteInstructions(initialInsns, (int) targetList.get(0).address);
+					System.out.println(this.blockList.get(temp.getFirstAddress()).instructionsToString());
+					BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after split
+					jumpBlock.setInstructionList(targetList);
+					jumpBlock.setReferences(initialAddrReferences);
+					jumpBlock.setLoopReferences(initialLoopReferences);
+					System.out.println(jumpBlock.instructionsToString());
 
-		
+				}
+			}
+		}*/
+		/*
+		if (!this.symtabExists) {
+			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
+			while (itr4.hasNext()) {
+				BasicBlock current = itr4.next();
+				for (Capstone.CsInsn instruction : current.getInstructionList()) {
+					if(current.getInstructionList().get(0).mnemonic.equals("push")&&current.getInstructionList().get(1).mnemonic.equals("mov")) {
+						if(current.getInstructionList().get(0).opStr.matches(".bp")) {
+							if(current.getInstructionList().get(1).opStr.matches(".bp, .sp")) {
+								Function function = new Function(Integer.toString(current.getFirstAddress()));
+								function.setStartAddr(current.getFirstAddress());
+								this.functions.add(function);
+								try {
+									int newMain = setMain();
+									disasm(newMain);
+								} catch(Exception e) {
+									System.out.println("no worries");
+								}
+							}
+						}
+					}
+				}
+			}
+		}		*/
 	}
 	
 	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
@@ -115,21 +228,39 @@ public class Disassemble {
 	    }
 	    return previousEntry.getValue();
 	}
-	
+	/*
 	public HashSet<Integer> getAssociatedAddresses(int function) {
-		HashSet<Integer> blockAddresses = new HashSet<Integer>();	
-		getFunctionReferences(this.blockList.get(function),blockAddresses);
+		getFunctionReferences(this.blockList.get(function));
 		return blockAddresses;
 	}
 	
 	
-	private void getFunctionReferences(BasicBlock block, HashSet<Integer> blockAddresses){ 
+	private void getFunctionReferences(BasicBlock block){ 
 	    for (int x : block.getAddressReferenceList()) {
-	    	if(blockAddresses.add(x)) {
+	    	//if (findNearest(this.blockList,x).getAddressReferenceList().size()==0){
+	    	//	System.out.println(x);
+	    	//}
+	    	if(!blockAddresses.contains(x)) {
+	    		System.out.print("associated addresses contains: ");
+	    		for (int y: blockAddresses) {
+	    			System.out.print(Integer.toHexString(y)+"; ");
+	    		}
+	    		System.out.println();
+	    		System.out.println("now adding "+Integer.toHexString(x));
+	    		blockAddresses.add(x);
+		    	getFunctionReferences(findNearest(this.blockList,x));
+	    	}
+	    	/*if(blockAddresses.add(x)) {
+	    		System.out.println("added x");
+	    		System.out.print("addociated addresses contains: ");
+	    		for (int y: blockAddresses) {
+	    			System.out.print(y+"; ");
+	    		}
+	    		System.out.println(x);
 		    	getFunctionReferences(findNearest(this.blockList,x), blockAddresses);
 	    	}
 		}
-	}
+	}*/
 	
 	
 	/*
@@ -175,63 +306,6 @@ public class Disassemble {
 		}
 	}
 
-
-	/*
-	private BasicBlock buildBlock2(int address) {
-		BasicBlock current = new BasicBlock(); 
-		while(address<entry+textSize) {
-			if (this.knownAddresses.contains(address)) {
-				
-			} else {
-				Capstone.CsInsn instruction;
-				instruction = disasmInstructionAtAddress(address, data, entry, textSize);
-				current.addInstruction(instruction);
-				
-				if (instruction.mnemonic.equals("ret")) {
-					return current;
-				} else if (instruction.mnemonic.matches("jmp")) {
-					int jmpAddr = getTargetAddress(instruction)-0x400000;
-					if (jmpAddr == -1) { // if invalid
-						return current; // couldn't resolve so just return this block, end of region
-					} else { // if valid
-						current.addAddressReference(jmpAddr); // add to referenced addresses
-						if(this.knownAddresses.contains(jmpAddr)) { 
-							// do nothing
-						} else {
-							this.possibleTargets.add(jmpAddr); // add the jump target to possibilities
-						}
-					}
-				} else if (isConditionalCti(instruction)) {
-					int jmpAddr = getTargetAddress(instruction)-0x400000;
-					if (jmpAddr == -1) { // if invalid
-						int continueAddr = address + instruction.size; 
-						if (this.knownAddresses.contains(continueAddr)) {
-							current.addAddressReference(continueAddr); // add reference but dont disassemble
-						} else {
-							current.addAddressReference(continueAddr);
-							this.possibleTargets.add(continueAddr);
-						}
-					} else { // if valid
-						current.addAddressReference(jmpAddr);
-						if(this.knownAddresses.contains(jmpAddr)) { 
-							current.addAddressReference(jmpAddr);
-						} else {
-							current.addAddressReference(jmpAddr);
-							this.possibleTargets.add(jmpAddr); // add the jump target to possibilities
-						}
-					}
-				} else if (instruction.mnemonic.equals("call")) {
-					int jmpAddr = getTargetAddress(instruction)-0x400000;
-					if (jmpAddr==-1) {
-						address+=instruction.size; // sneakily skip past call instructions
-					} else {
-						address+=instruction.size; // sneakily skip past call instructions
-					}
-				}
-			}
-		}
-	}*/
-	
 	private BasicBlock buildBlock(int address) {
 		BasicBlock current = new BasicBlock();
 		while (address < entry + textSize) {
@@ -252,10 +326,15 @@ public class Disassemble {
 				int jumpAddr = getTargetAddress(instruction)-0x400000; // determine CTI destination
 				if (jumpAddr != -1) { // if dest can be reached
 					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
+						//if (jumpAddr == )
 						if (!this.knownAddresses.contains(jumpAddr)) {
 							this.possibleTargets.add(jumpAddr); // one target to disassemble at
 							current.addAddressReference(jumpAddr+0x400000);
-						} else {
+						} else if(this.knownAddresses.contains(jumpAddr)&&!this.blockList.containsKey(jumpAddr+0x400000)) {
+							this.midBlockTargets.add(jumpAddr);
+							current.addAddressReference(jumpAddr+0x400000);
+						}
+						else {
 							current.addAddressReference(jumpAddr+0x400000);
 						}
 					} else {
@@ -272,7 +351,7 @@ public class Disassemble {
 					//current.addAddressReference(continueAddr+0x400000);
 				}
 				// END DEALING WITH FALLTHROUGH
-				System.out.println("block added "+this.blockList.size() );
+				//System.out.println("block added "+this.blockList.size() );
 				return current;
 			} else { // its not a CTI so disasm next
 				address += instruction.size;
@@ -280,6 +359,77 @@ public class Disassemble {
 		}
 		return current;
 	}
+	
+	/*
+	private void disasmFunction(int address) {
+		for (int i = 0; i < this.possibleTargets.size(); i++) {
+			BasicBlock current = buildBlockFunction(this.possibleTargets.get(i));
+			if(current.getBlockSize()!=0) {
+				this.blockList.put(current.getFirstAddress(),current);
+			}
+		}
+	}
+
+	private BasicBlock buildBlockFunction(int address) {
+		BasicBlock current = new BasicBlock();
+		while (address < entry + textSize) {
+			if (this.knownAddresses.contains(address)) {
+				return current;
+			}
+			Capstone.CsInsn instruction;
+			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
+			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
+			current.addInstruction(instruction);
+
+			if (instruction.mnemonic.equals("ret")) {
+				return current;
+			}
+
+			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
+				// BEGIN DEALING WITH JUMP TARGET
+				int jumpAddr = getTargetAddress(instruction)-0x400000; // determine CTI destination
+				if (jumpAddr != -1) { // if dest can be reached
+					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
+						//if (jumpAddr == )
+						if (!this.knownAddresses.contains(jumpAddr)) {
+							this.possibleTargets.add(jumpAddr); // one target to disassemble at
+							current.addAddressReference(jumpAddr+0x400000);
+						} else if(this.knownAddresses.contains(jumpAddr)&&!this.blockList.containsKey(jumpAddr+0x400000)) {
+							this.midBlockTargets.add(jumpAddr);
+							current.addAddressReference(jumpAddr+0x400000);
+						}
+						else {
+							current.addAddressReference(jumpAddr+0x400000);
+						}
+					} else {
+						current.addAddressReferenceOutOfScope(jumpAddr);
+						//current.addAddressReference(address+0x400000);
+					}
+				}
+				// END DEALIGN WITH JUMP TARGET, BEGIN DEALING WITH FALLTHROUGH
+				int continueAddr = address + instruction.size; // diasm at enxt inst address
+				if (!instruction.mnemonic.equals("jmp")) {
+					this.possibleTargets.add(continueAddr); // add next address to possible target
+					current.addAddressReference(continueAddr+0x400000);
+				} else {
+					//current.addAddressReference(continueAddr+0x400000);
+				}
+				// END DEALING WITH FALLTHROUGH
+				//System.out.println("block added "+this.blockList.size() );
+				return current;
+			} else { // its not a CTI so disasm next
+				address += instruction.size;
+			}
+		}
+		return current;
+	}*/
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	

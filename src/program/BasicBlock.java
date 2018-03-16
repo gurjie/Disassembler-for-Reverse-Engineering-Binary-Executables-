@@ -3,18 +3,20 @@ package program;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import capstone.Capstone;
 import capstone.Capstone.CsInsn;
 
 public class BasicBlock {
-	private int startAddress;
 	private ArrayList<Capstone.CsInsn> instructionList;
-	private int endAddress;
 	private HashSet<Integer> addressReferences = new HashSet<Integer>();
 	private HashSet<Integer> loopAddressReferences = new HashSet<Integer>();
 	private HashSet<Integer> outOfScopeReferences = new HashSet<Integer>();
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
+	private int startAddress;
+	private int endAddress;
 
 	public BasicBlock() {
 		instructionList = new ArrayList<Capstone.CsInsn>();
@@ -44,27 +46,70 @@ public class BasicBlock {
 		return this.instructionList.get(0);
 	}
 	
+	public boolean containsAddress(int address) {
+		if(address<=this.endAddress&&address>=this.startAddress) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	public int indexOfAddress(int address) {
+		for(Capstone.CsInsn inst : this.instructionList) {
+			if(inst.address==address) {
+				return this.instructionList.indexOf(inst);
+			}
+		}
+		return 0;
+	}
+	
+	public void overwriteInstructions(ArrayList<CsInsn> newList,int newReference) {
+		this.instructionList = newList;
+		this.addressReferences.clear();
+		this.addressReferences.add(newReference);
+	}
+	
+	public void setInstructionList(ArrayList<CsInsn> newList) {
+		this.instructionList = newList;
+		this.startAddress = (int) newList.get(0).address;
+		this.startAddress = (int) newList.get(newList.size()-1).address;
+	}
+	
+	public void setReferences(HashSet<Integer> initialReferences) {
+		this.addressReferences = initialReferences;
+	}
+	
+	public void setLoopReferences(HashSet<Integer> initialLoopReferences) {
+		this.loopAddressReferences = initialLoopReferences;
+	}
+	
 
 	public String instructionsToString() {
 		String instStr = "";
-		instStr = instStr.concat("-------START-------\n");
+		//instStr = instStr.concat("-------START-------\n");
 		for (Capstone.CsInsn instruction : instructionList) {
 			instStr = instStr.concat(String.format("0x%x:\t%s\t %s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr));
 			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
 		}
-		instStr = instStr.concat("-------END-------\n");
+		//instStr = instStr.concat("-------END-------\n");
 		instStr = instStr.concat("references: ");
 		for (int reference:addressReferences) {
-			instStr = instStr.concat((reference+"; "));
+			instStr = instStr.concat(("0x"+Integer.toHexString(reference)+"; "));
 		}
 		for (int reference:loopAddressReferences) {
-			instStr = instStr.concat((reference+"; "));
+			instStr = instStr.concat(("0x"+Integer.toHexString(reference)+"; "));
 		}
 		instStr = instStr.concat("\n");
 		return instStr;
 	}
 
 	public void addInstruction(Capstone.CsInsn instruction) {
+		if(this.instructionList.isEmpty()) {
+			this.startAddress = (int) instruction.address;
+			this.endAddress = (int) instruction.address;
+		} else {
+			this.endAddress = (int) instruction.address;
+		}
 		this.instructionList.add(instruction);
 	}
 
@@ -96,6 +141,29 @@ public class BasicBlock {
 	
 	public boolean isEmpty() {
 		return this.instructionList.isEmpty();
+	}
+	
+	public void splitBlock(int address, Map<Integer,BasicBlock> blockList) {
+		//BasicBlock temp = blockList.get
+	}
+	
+	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
+	    Map.Entry<Integer, BasicBlock> previousEntry = null;
+	    for (Entry<Integer, BasicBlock> e : map.entrySet()) {
+	        if (e.getKey().compareTo(value) >= 0) {
+	            if (previousEntry == null) {
+	                return e.getValue();
+	            } else {
+	                if (e.getKey() - value >= value - previousEntry.getKey()) {
+	                    return previousEntry.getValue();
+	                } else {
+	                    return e.getValue();
+	                }
+	            }
+	        }
+	        previousEntry = e;
+	    }
+	    return previousEntry.getValue();
 	}
 
 	/**
