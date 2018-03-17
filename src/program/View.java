@@ -1,5 +1,7 @@
 package program;
 
+import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.FlowLayout;
 
 import javax.swing.DefaultListModel;
@@ -13,25 +15,17 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JToolBar;
+
+import com.mxgraph.swing.mxGraphComponent;
 
 public class View {
 
 	// View uses Swing framework to display UI to user
-	
+
 	private JFrame frame;
-	/*
-	private JLabel firstnameLabel;
-	private JLabel lastnameLabel;
-	private JTextField firstnameTextfield;
-	private JTextField lastnameTextfield;
-	private JButton firstnameSaveButton;
-	private JButton lastnameSaveButton;
-	private JButton hello;
-	private JButton bye;
-	*/
-	
 	private JMenuBar menuBar;
 	private JMenu menuFile;
 	private JMenuItem fileMenuLoad;
@@ -57,24 +51,23 @@ public class View {
 	private JScrollPane instScrollPane;
 	private JPanel instPanel;
 	private JTable instTable;
-	private JScrollPane graphScrollPane;
-	private JPanel graphPane;
-	private FlowLayout fl_graphPane;
+	// private JScrollPane graphScrollPane;
+	// private JPanel graphPane;
+	// private FlowLayout fl_graphPane;
 	private DefaultListModel<String> sectionModel;
 	private DefaultListModel<Function> functionModel;
+	private JTabbedPane graphTabbedPane;
 
-	
 	public View(String title) {
 		frame = new JFrame(title);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setBounds(100,100,1261,808);
+		frame.setBounds(100, 100, 1261, 808);
 		frame.setVisible(true);
 
-		// Create UI elements
 		menuBar = new JMenuBar();
 		menuFile = new JMenu("File");
-		fileMenuLoad = new JMenuItem("Load Executable");		
-		fileMenuExit = new JMenuItem("Exit");		
+		fileMenuLoad = new JMenuItem("Load Executable");
+		fileMenuExit = new JMenuItem("Exit");
 		menuEdit = new JMenu("Edit");
 		menuHelp = new JMenu("Help");
 		toolBar = new JToolBar();
@@ -97,55 +90,23 @@ public class View {
 		mainPane = new JSplitPane();
 		instScrollPane = new JScrollPane();
 		instPanel = new JPanel();
-		graphScrollPane = new JScrollPane();
-		graphPane = new JPanel();
+		// graphScrollPane = new JScrollPane();
+		// graphPane = new JPanel();
+		graphTabbedPane = new JTabbedPane(JTabbedPane.TOP);
+	}
 
-		/*
-		firstnameLabel = new JLabel("Firstname :");
-		lastnameLabel = new JLabel("Lastname :");
-		firstnameTextfield = new JTextField();
-		lastnameTextfield = new JTextField();
-		firstnameSaveButton = new JButton("Save firstname");
-		lastnameSaveButton = new JButton("Save lastname");
-		hello = new JButton("Hello!");
-		bye = new JButton("Bye!");
-		
-		GroupLayout layout = new GroupLayout(frame.getContentPane());
-		layout.setAutoCreateGaps(true);
-		layout.setAutoCreateContainerGaps(true);
-		layout.setHorizontalGroup(layout.createSequentialGroup()
-				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(firstnameLabel)
-						.addComponent(lastnameLabel))
-				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(firstnameTextfield)
-						.addComponent(lastnameTextfield))
-				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(firstnameSaveButton)
-						.addComponent(lastnameSaveButton))
-				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(hello)
-						.addComponent(bye)));
-		layout.setVerticalGroup(layout.createSequentialGroup()
-				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(firstnameLabel)
-						.addComponent(firstnameTextfield).addComponent(firstnameSaveButton).addComponent(hello))
-				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(lastnameLabel)
-						.addComponent(lastnameTextfield).addComponent(lastnameSaveButton).addComponent(bye)));
-
-		layout.linkSize(SwingConstants.HORIZONTAL, firstnameSaveButton, lastnameSaveButton);
-		layout.linkSize(SwingConstants.HORIZONTAL, hello, bye);
-		frame.getContentPane().setLayout(layout);*/
+	public JTabbedPane getGraphTabbedPane() {
+		return graphTabbedPane;
 	}
 
 	public JTable getInstTable() {
 		return instTable;
 	}
-	
-	/*
-	public void setInstTable(Object content, String[] columnNames) {
-		this.instTable = new JTable(content,columnNames);
-	}*/
 
 	public DefaultListModel<String> getSectionModel() {
 		return sectionModel;
 	}
-	
+
 	public DefaultListModel<Function> getFunctionModel() {
 		return functionModel;
 	}
@@ -157,11 +118,11 @@ public class View {
 	public JMenu getMenuFile() {
 		return menuFile;
 	}
-	
+
 	public JMenuItem getFileMenuLoad() {
 		return fileMenuLoad;
 	}
-	
+
 	public JMenuItem getFileMenuExit() {
 		return fileMenuExit;
 	}
@@ -189,11 +150,11 @@ public class View {
 	public JButton getCfgButton() {
 		return cfgButton;
 	}
-	
+
 	public JButton getZoomInButton() {
 		return zoomInButton;
 	}
-	
+
 	public JButton getZoomOutButton() {
 		return zoomOutButton;
 	}
@@ -209,7 +170,7 @@ public class View {
 	public JPanel getSectionsPanel() {
 		return sectionsPanel;
 	}
-	
+
 	public JScrollPane getSectionsScrollPane() {
 		return sectionsScrollPane;
 	}
@@ -222,7 +183,6 @@ public class View {
 		return lblSections;
 	}
 
-
 	public JScrollPane getListScrollPane() {
 		return listScrollPane;
 	}
@@ -230,7 +190,7 @@ public class View {
 	public JList<Function> getFunctionList() {
 		return functionList;
 	}
-	
+
 	public JLabel getFunctionLabel() {
 		return lblFunctions;
 	}
@@ -247,22 +207,17 @@ public class View {
 		return instPanel;
 	}
 
-	public JScrollPane getGraphScrollPane() {
-		return graphScrollPane;
-	}
+	/*
+	 * public JScrollPane getGraphScrollPane() { return graphScrollPane; }
+	 * 
+	 * public JPanel getGraphPane() { return graphPane; }
+	 * 
+	 * public void setFlGraphPane () { this.fl_graphPane = (FlowLayout)
+	 * graphPane.getLayout(); }
+	 * 
+	 * public FlowLayout getFlGraphPane () { return fl_graphPane; }
+	 */
 
-	public JPanel getGraphPane() {
-		return graphPane;
-	}
-
-	public void setFlGraphPane () {
-		this.fl_graphPane = (FlowLayout) graphPane.getLayout();
-	}
-	
-	public FlowLayout getFlGraphPane () {
-		return fl_graphPane;
-	}
-	
 	public JFrame getFrame() {
 		return frame;
 	}
@@ -270,13 +225,30 @@ public class View {
 	public void setFrame(JFrame frame) {
 		this.frame = frame;
 	}
-	
-	public void resetGraphPane() {
-		this.graphPane = new JPanel();
-	}
-	
-	public void resetGraphScrollPane() {
-		this.graphScrollPane = new JScrollPane();
+
+	/*
+	 * public void resetGraphPane() { this.graphPane = new JPanel(); }
+	 * 
+	 * public void resetGraphScrollPane() { this.graphScrollPane = new
+	 * JScrollPane(); }
+	 */
+
+	public void addTab(String name, mxGraphComponent component) {
+		if (this.graphTabbedPane.indexOfTab(name) == -1) {
+			JScrollPane newScrollPane = new JScrollPane();
+			JPanel graphPanel = new JPanel();
+			FlowLayout fl_graphPanel = (FlowLayout) graphPanel.getLayout();
+			fl_graphPanel.setHgap(150);
+			newScrollPane.setViewportView(graphPanel);
+			newScrollPane.removeMouseWheelListener(newScrollPane.getMouseWheelListeners()[0]);
+			graphPanel.setLayout(new BorderLayout());
+			graphPanel.add(component, BorderLayout.CENTER);
+			graphPanel.validate();
+			this.graphTabbedPane.addTab(name, component);
+			this.graphTabbedPane.setSelectedComponent(component);
+		} else {
+			this.graphTabbedPane.setSelectedIndex(this.graphTabbedPane.indexOfTab(name));
+		}
 	}
 
 }

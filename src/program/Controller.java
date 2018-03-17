@@ -75,14 +75,18 @@ public class Controller {
 		view.getEncompassingPane().setRightComponent(view.getMainPane());
 		view.getMainPane().setRightComponent(view.getInstScrollPane());
 		view.getInstScrollPane().setViewportView(view.getInstPanel());
-		view.getMainPane().setLeftComponent(view.getGraphScrollPane());
+		view.getMainPane().setLeftComponent(view.getGraphTabbedPane());
+		view.getMainPane().setDividerLocation(250);
+		//view.getMainPane().setLeftComponent(view.getGraphScrollPane());
+		/*
 		view.setFlGraphPane();
 		view.getFlGraphPane().setHgap(150);
 		view.getGraphScrollPane().setViewportView(view.getGraphPane());
 		view.getGraphScrollPane().removeMouseWheelListener(view.getGraphScrollPane().getMouseWheelListeners()[0]);
-
+*/
 		// view.getLastnameTextfield().setText(model.getLastname());
 	}
+	
 
 	public void initController() {
 		view.getFileMenuLoad().addActionListener(e -> {
@@ -135,6 +139,7 @@ public class Controller {
 	}
 
 	private void loadFile() {
+		view.getGraphTabbedPane().removeAll();
 		view.getFunctionModel().removeAllElements();
 		view.getSectionModel().removeAllElements();
 		JFileChooser fileChooser = new JFileChooser();
@@ -260,7 +265,8 @@ public class Controller {
 	}
 
 	private void showCFG(Function f) {
-		view.getGraphPane().removeAll();
+		//view.getGraphTabbedPane().addTab("Main", view.getGraphScrollPane());
+		//view.getGraphPane().removeAll();
 		this.graph = new mxGraph();
 		Object parent = graph.getDefaultParent();
 		graph.getModel().beginUpdate();
@@ -338,9 +344,10 @@ public class Controller {
 		// graph.groupCells();
 		graph.setCellsEditable(false);
 		graphComponent.setConnectable(false);
-		view.getGraphPane().setLayout(new BorderLayout());
-		view.getGraphPane().add(graphComponent, BorderLayout.CENTER);
-		view.getGraphPane().validate();
+		//view.getGraphPane().setLayout(new BorderLayout());
+		//view.getGraphPane().add(graphComponent, BorderLayout.CENTER);
+		//view.getGraphPane().validate();
+		view.addTab(f.getName(), graphComponent);
 		initZoomListeners(graphComponent);
 		graphComponent.validate();
 	}
