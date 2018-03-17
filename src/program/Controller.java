@@ -114,11 +114,17 @@ public class Controller {
 			public void mouseClicked(MouseEvent evt) {
 				JList list = (JList) evt.getSource();
 				if (evt.getClickCount() == 2) {
-
 					// Double-click detected
 					int index = list.locationToIndex(evt.getPoint());
 					selectedFunction = view.getFunctionList().getSelectedValue();
-					showCFG(selectedFunction);
+					if (selectedFunction.getStartAddr()==0) {
+						System.out.println("x");
+						JOptionPane.showMessageDialog(new JFrame(), selectedFunction.getName()+" is a shared library! Can't display disassembly.", 
+								"Shared library", JOptionPane.INFORMATION_MESSAGE);
+					} else {
+						showCFG(selectedFunction);
+					}
+					
 				}
 			}
 		});
@@ -171,9 +177,9 @@ public class Controller {
 							}
 
 						});
-
-						initFunctionsListener();
 					}
+					initFunctionsListener();
+
 				}
 
 			} catch (ReadException e) {
@@ -191,6 +197,7 @@ public class Controller {
 	private void export() {
 		if (this.loaded == true) {
 			try {
+				String name = selectedFunction.getName();
 				String home = System.getProperty("user.home");
 				String exportDirName = this.model.getFile().getName() + "_exports";
 				File exportDir = new File(home, exportDirName);
@@ -209,9 +216,9 @@ public class Controller {
 						System.out.println("DIR created");
 					}
 				}
-				String exportName = "export.png";
+				String exportName = name+".png";
 				int exportNumber = 0;
-				String exportFileName = "export";
+				String exportFileName = name;
 				String exportSuffix = ".png";
 				while (new File(home + "/" + exportDirName, exportName).exists()) {
 					exportNumber++;

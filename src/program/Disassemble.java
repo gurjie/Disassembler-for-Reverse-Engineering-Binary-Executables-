@@ -5,9 +5,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -15,10 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.logging.Logger;
-
 import capstone.Capstone;
-import capstone.Capstone.CsInsn;
 import elf.Elf;
 import elf.SectionHeader;
 
@@ -58,6 +52,7 @@ public class Disassemble {
 		} catch (IOException e) {
 			throw new ElfException(e.getMessage() + "\nPerhaps select an ELF 64 bit file");
 		}
+		//System.out.println(elf.header);
 
 		this.entry = (int) getTextSection(elf).fileOffset;
 		this.textSize = (int) getTextSection(elf).size;
@@ -142,7 +137,7 @@ public class Disassemble {
 		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
 		while (itr3.hasNext()) {
 			BasicBlock current = itr3.next();
-			//System.out.println(current.instructionsToString());
+			System.out.println(current.instructionsToString());
 		}
 		/*
 		for(int x: this.midBlockTargets) {
@@ -210,6 +205,7 @@ public class Disassemble {
 		}		*/
 	}
 	
+	/*
 	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
 	    Map.Entry<Integer, BasicBlock> previousEntry = null;
 	    for (Entry<Integer, BasicBlock> e : map.entrySet()) {
@@ -227,7 +223,7 @@ public class Disassemble {
 	        previousEntry = e;
 	    }
 	    return previousEntry.getValue();
-	}
+	}*/
 	/*
 	public HashSet<Integer> getAssociatedAddresses(int function) {
 		getFunctionReferences(this.blockList.get(function));
@@ -274,11 +270,20 @@ public class Disassemble {
 		}
 	}*/
 	
+	/**
+	 * get the list of instruction blocks
+	 * @return list of instruction blocks that have been disassembled
+	 */
 	public Map<Integer,BasicBlock> getBasicBlocks() {
 		return this.blockList;
 	}
 
 	
+	/**
+	 * Find the main function
+	 * @return the address of the main function
+	 * @throws MainDiscoveryException if the main function couldn't be found
+	 */
 	private int setMain() throws MainDiscoveryException {
 		if (this.symtabExists&&this.strtabExists) {
 			for (Function funct : functions) {
@@ -297,6 +302,13 @@ public class Disassemble {
 	}
 	
 	
+	/**
+	 * For all possible target disassembly addresses in the list, build a BasicBlock block
+	 * by calling buildBlock, which will build a basic block of instructions and add it the 
+	 * list of disassembled blocks if the block is not empty. Can disassemble at all 
+	 * valid targets of the input address
+	 * @param address beginning address; should be 'main'
+	 */
 	private void disasm(int address) {
 		for (int i = 0; i < this.possibleTargets.size(); i++) {
 			BasicBlock current = buildBlock(this.possibleTargets.get(i));
@@ -306,6 +318,25 @@ public class Disassemble {
 		}
 	}
 
+	/**
+	 * - Takes an address to start at as an argument, builds the first basic block
+	 * - while address is in .text, decode instruction at the input address, and then disassembles at addres+sizeof(instruction)
+	 * - if the current instruction is a conditional control transfer instruction, and its target is a clearly defined
+	 * address within the scope of the .text section, 1) if the address is not known, disassemble at this address,
+	 * 2) else if the address is known but is not that start of a basic block, add to a list of blocks to be split
+	 * (as the jump is somewhere in some existing basic block) and add reference to the block 3) else add a reference
+	 * to the target address from this basic block, but don't disassemble there, as that has already been done. 
+	 * 
+	 * - Then begin dealing with the follow through instruction of the CTI: if it's not a jump instruction,
+	 * the next instruction after this (conditional) CTI must also be a target of the CTI.
+	 * i.e. jz 0x4002860 has 0x4002860 and also jz.address+sizeof(jz) as targets.
+	 * - Add this target address as an address referenced by the current block, and disassemble at the target.
+	 * - This means that the end of the current block has reached, and control is being transferred: return current block
+	 * 
+	 * - In the case that the current instruction is not a CTI or return, simply disassemble at the next address.
+	 * @param address to decode the instruction at
+	 * @return the current basic block of instructions
+	 */
 	private BasicBlock buildBlock(int address) {
 		BasicBlock current = new BasicBlock();
 		while (address < entry + textSize) {
@@ -314,7 +345,6 @@ public class Disassemble {
 			}
 			Capstone.CsInsn instruction;
 			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
-			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
 			current.addInstruction(instruction);
 
 			if (instruction.mnemonic.equals("ret")) {
@@ -322,13 +352,11 @@ public class Disassemble {
 			}
 
 			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
-				// BEGIN DEALING WITH JUMP TARGET
-				int jumpAddr = getTargetAddress(instruction)-0x400000; // determine CTI destination
-				if (jumpAddr != -1) { // if dest can be reached
-					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
-						//if (jumpAddr == )
+				int jumpAddr = getTargetAddress(instruction)-0x400000; 
+				if (jumpAddr != -1) { 
+					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { 
 						if (!this.knownAddresses.contains(jumpAddr)) {
-							this.possibleTargets.add(jumpAddr); // one target to disassemble at
+							this.possibleTargets.add(jumpAddr); 
 							current.addAddressReference(jumpAddr+0x400000);
 						} else if(this.knownAddresses.contains(jumpAddr)&&!this.blockList.containsKey(jumpAddr+0x400000)) {
 							this.midBlockTargets.add(jumpAddr);
@@ -339,106 +367,32 @@ public class Disassemble {
 						}
 					} else {
 						current.addAddressReferenceOutOfScope(jumpAddr);
-						//current.addAddressReference(address+0x400000);
 					}
 				}
-				// END DEALIGN WITH JUMP TARGET, BEGIN DEALING WITH FALLTHROUGH
-				int continueAddr = address + instruction.size; // diasm at enxt inst address
+				int continueAddr = address + instruction.size; 
 				if (!instruction.mnemonic.equals("jmp")) {
-					this.possibleTargets.add(continueAddr); // add next address to possible target
+					this.possibleTargets.add(continueAddr); 
 					current.addAddressReference(continueAddr+0x400000);
-				} else {
-					//current.addAddressReference(continueAddr+0x400000);
-				}
-				// END DEALING WITH FALLTHROUGH
-				//System.out.println("block added "+this.blockList.size() );
+				} 
 				return current;
-			} else { // its not a CTI so disasm next
+			} else { 
 				address += instruction.size;
 			}
 		}
 		return current;
 	}
 	
-	/*
-	private void disasmFunction(int address) {
-		for (int i = 0; i < this.possibleTargets.size(); i++) {
-			BasicBlock current = buildBlockFunction(this.possibleTargets.get(i));
-			if(current.getBlockSize()!=0) {
-				this.blockList.put(current.getFirstAddress(),current);
-			}
-		}
-	}
-
-	private BasicBlock buildBlockFunction(int address) {
-		BasicBlock current = new BasicBlock();
-		while (address < entry + textSize) {
-			if (this.knownAddresses.contains(address)) {
-				return current;
-			}
-			Capstone.CsInsn instruction;
-			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
-			//System.out.printf("0x%x:\t%s\t%s\n", (int) instruction.address, instruction.mnemonic, instruction.opStr);
-			current.addInstruction(instruction);
-
-			if (instruction.mnemonic.equals("ret")) {
-				return current;
-			}
-
-			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
-				// BEGIN DEALING WITH JUMP TARGET
-				int jumpAddr = getTargetAddress(instruction)-0x400000; // determine CTI destination
-				if (jumpAddr != -1) { // if dest can be reached
-					if (jumpAddr >= entry && jumpAddr <= entry + textSize) { // if within text section
-						//if (jumpAddr == )
-						if (!this.knownAddresses.contains(jumpAddr)) {
-							this.possibleTargets.add(jumpAddr); // one target to disassemble at
-							current.addAddressReference(jumpAddr+0x400000);
-						} else if(this.knownAddresses.contains(jumpAddr)&&!this.blockList.containsKey(jumpAddr+0x400000)) {
-							this.midBlockTargets.add(jumpAddr);
-							current.addAddressReference(jumpAddr+0x400000);
-						}
-						else {
-							current.addAddressReference(jumpAddr+0x400000);
-						}
-					} else {
-						current.addAddressReferenceOutOfScope(jumpAddr);
-						//current.addAddressReference(address+0x400000);
-					}
-				}
-				// END DEALIGN WITH JUMP TARGET, BEGIN DEALING WITH FALLTHROUGH
-				int continueAddr = address + instruction.size; // diasm at enxt inst address
-				if (!instruction.mnemonic.equals("jmp")) {
-					this.possibleTargets.add(continueAddr); // add next address to possible target
-					current.addAddressReference(continueAddr+0x400000);
-				} else {
-					//current.addAddressReference(continueAddr+0x400000);
-				}
-				// END DEALING WITH FALLTHROUGH
-				//System.out.println("block added "+this.blockList.size() );
-				return current;
-			} else { // its not a CTI so disasm next
-				address += instruction.size;
-			}
-		}
-		return current;
-	}*/
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-
+	/**
+	 * get the list of functions known in the ELF
+	 * @return list of functions
+	 */
 	public List<Function> getFunctions() {
 		return this.functions;
 	}
 
+	/**
+	 * sets the sections in the ELF 
+	 */
 	private void setSections() {
 		for (SectionHeader shrs : this.elf.sectionHeaders) {
 			checkForSymtab(shrs);
@@ -448,6 +402,10 @@ public class Disassemble {
 		}
 	}
 
+	/**
+	 * Parse the symbol table and resolve all symbols in the ELF, then take the useful ones (functions)
+	 * and build a list of functions
+	 */
 	private void resolveSymbols() {
 		if (this.symtabExists) {
 			int symtab_size = (int) this.symtab.size;
@@ -469,10 +427,19 @@ public class Disassemble {
 		}
 	}
 
+	/**
+	 * Get sections in the ELF
+	 * @return list of sections in ELF
+	 */
 	public List<Section> getSections() {
 		return this.sections;
 	}
 
+	/**
+	 * If an entry in the symbol table has the type property corresponding to what is defined
+	 * as a function, add it to the list of known program functions 
+	 * @param sym symbol entry to be checked whether it is a function or not
+	 */
 	private void addFunctionFromSymtab(SymbolEntry sym) {
 		if (sym.getType().equals("STT_FUNCT")) {
 			Function current = new Function(sym.getName());
@@ -486,6 +453,10 @@ public class Disassemble {
 		}
 	}
 
+	/**
+	 * Find out whether this section header passed in is the symbol table
+	 * @param sectionHeader to be parsed
+	 */
 	private void checkForSymtab(SectionHeader sectionHeader) {
 		if (sectionHeader.getName().equals(".symtab")) {
 			this.symtabExists = true;
@@ -493,6 +464,10 @@ public class Disassemble {
 		}
 	}
 
+	/**
+	 * Find out whether this section header passed in is the string table
+	 * @param sectionHeader to be parsed
+	 */
 	private void checkForStrTab(SectionHeader sectionHeader) {
 		if (sectionHeader.getName().equals(".strtab")) {
 			this.strtabExists = true;
@@ -500,10 +475,19 @@ public class Disassemble {
 		}
 	}
 
+	/**
+	 * Does the symtab exist?
+	 * @return true if symtabExists field is true, false otherwise
+	 */
 	public boolean symTabExists() {
 		return this.symtabExists;
 	}
 
+	/**
+	 * is the instruction an unconditional control transfer instruction?
+	 * @param instruction to be parsed
+	 * @return true if UnconCti, false otherwise
+	 */
 	private boolean isUnconditionalCti(Capstone.CsInsn instruction) {
 		if (!instruction.mnemonic.matches("jmp|call|int")) {
 			return false;
@@ -512,6 +496,11 @@ public class Disassemble {
 	}
 	
 
+	/**
+	 * is the instruction a return instruction?
+	 * @param instruction to be parsed
+	 * @return true if return, false if otherwise
+	 */
 	private boolean isReturnInstruction(Capstone.CsInsn instruction) {
 		if (!instruction.mnemonic.equals("ret")) {
 			return false;
@@ -519,6 +508,12 @@ public class Disassemble {
 		return true;
 	}
 
+	/**
+	 * is the instruction passed in a conditional control transfer?
+	 * i.e. jne, jz, jnz etc...proeprty: has a target and fallthrough instruction
+	 * @param instruction to be parsed
+	 * @return true if conditional cti, false otherwise
+	 */
 	private boolean isConditionalCti(Capstone.CsInsn instruction) {
 		if (this.conditionalCtis.contains(instruction.mnemonic)) {
 			return true;
@@ -527,6 +522,11 @@ public class Disassemble {
 
 	}
 
+	/**
+	 * get target address of an instruction with a clear target address
+	 * @param instruction to be parsed 
+	 * @return the operand representing the target address 
+	 */
 	private int getTargetAddress(Capstone.CsInsn instruction) {
 		try {
 			long address = Long.decode(instruction.opStr.trim());
@@ -536,6 +536,11 @@ public class Disassemble {
 		}
 	}
 	
+	/**
+	 * Converts a string representing an numerical address to integer
+	 * @param string to be converted
+	 * @return the integer representation, -1 if unsuccessful (i.e. string not numerical)
+	 */
 	private int resolveAddressFromString(String string) {
 		try {
 			long address = Long.decode(string.trim());
@@ -574,6 +579,9 @@ public class Disassemble {
 		return null;
 	}
 
+	/**
+	 * Adds control transfer instructions to a local list of cti instructions
+	 */
 	private void buildConditionalCtis() {
 		this.conditionalCtis.add("ja");
 		this.conditionalCtis.add("jnbe");
@@ -607,6 +615,13 @@ public class Disassemble {
 		this.conditionalCtis.add("js");
 	}
 	
+	/**
+	 * Quite experimental but can find the 'main' function on basic stripped ELFs
+	 * @param entry entry point of the program (beggining of _start)
+	 * @param textSize size of the .text section
+	 * @param data: ELF file represented as a sequence of bytes
+	 * @return the address of the main function
+	 */
 	private int discoverMain(int entry, int textSize, byte[] data) {
 		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>();
 		text_bytes = Arrays.copyOfRange(data, entry, (int) (entry + 15));
@@ -655,6 +670,11 @@ public class Disassemble {
 		}
 	}*/
 
+	/**
+	 * Get the text section for the ELF passes as argument
+	 * @param elf file with text seciton to be extracted
+	 * @return SectionHeader with name .text
+	 */
 	private SectionHeader getTextSection(Elf elf) {
 		for (SectionHeader shrs : elf.sectionHeaders) {
 			if (shrs.getName().equals(".text")) {
