@@ -143,28 +143,6 @@ public class BasicBlock {
 		return this.instructionList.isEmpty();
 	}
 	
-	public void splitBlock(int address, Map<Integer,BasicBlock> blockList) {
-		//BasicBlock temp = blockList.get
-	}
-	
-	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
-	    Map.Entry<Integer, BasicBlock> previousEntry = null;
-	    for (Entry<Integer, BasicBlock> e : map.entrySet()) {
-	        if (e.getKey().compareTo(value) >= 0) {
-	            if (previousEntry == null) {
-	                return e.getValue();
-	            } else {
-	                if (e.getKey() - value >= value - previousEntry.getKey()) {
-	                    return previousEntry.getValue();
-	                } else {
-	                    return e.getValue();
-	                }
-	            }
-	        }
-	        previousEntry = e;
-	    }
-	    return previousEntry.getValue();
-	}
 
 	/**
 	 * public int getStartAddress() { // TODO Auto-generated method stub return

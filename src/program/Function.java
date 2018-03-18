@@ -8,7 +8,6 @@ public class Function {
 	private long startAddr;
 	private long endAddr; 
 	private String name;
-	//private HashSet<Integer> associatedAddresses;
 	private HashSet<Integer> blockAddresses = new HashSet<Integer>();	
 
 	
@@ -52,28 +51,10 @@ public class Function {
 	
 	private void getFunctionReferences(BasicBlock block, Map<Integer, BasicBlock> blockList){ 
 	    for (int x : block.getAddressReferenceList()) {
-	    	//if (findNearest(this.blockList,x).getAddressReferenceList().size()==0){
-	    	//	System.out.println(x);
-	    	//}
 	    	if(!blockAddresses.contains(x)) {
-	    		//System.out.print("associated addresses contains: ");
-	    		//for (int y: blockAddresses) {
-	    			//System.out.print(Integer.toHexString(y)+"; ");
-	    		//}
-	    		//System.out.println();
-	    		//System.out.println("now adding "+Integer.toHexString(x));
 	    		blockAddresses.add(x);
 		    	getFunctionReferences(findNearest(blockList,x),blockList);
 	    	}
-	    	/*if(blockAddresses.add(x)) {
-	    		System.out.println("added x");
-	    		System.out.print("addociated addresses contains: ");
-	    		for (int y: blockAddresses) {
-	    			System.out.print(y+"; ");
-	    		}
-	    		System.out.println(x);
-		    	getFunctionReferences(findNearest(this.blockList,x), blockAddresses);
-	    	}*/
 		}
 	}
 	

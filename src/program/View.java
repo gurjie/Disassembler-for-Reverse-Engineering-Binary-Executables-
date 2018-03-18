@@ -3,6 +3,7 @@ package program;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.FlowLayout;
+import java.awt.Rectangle;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;

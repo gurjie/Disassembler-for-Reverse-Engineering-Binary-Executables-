@@ -3,6 +3,7 @@ package program;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -76,17 +77,16 @@ public class Controller {
 		view.getMainPane().setRightComponent(view.getInstScrollPane());
 		view.getInstScrollPane().setViewportView(view.getInstPanel());
 		view.getMainPane().setLeftComponent(view.getGraphTabbedPane());
-		view.getMainPane().setDividerLocation(250);
-		//view.getMainPane().setLeftComponent(view.getGraphScrollPane());
+		view.getMainPane().setDividerLocation(450);
+		// view.getMainPane().setLeftComponent(view.getGraphScrollPane());
 		/*
-		view.setFlGraphPane();
-		view.getFlGraphPane().setHgap(150);
-		view.getGraphScrollPane().setViewportView(view.getGraphPane());
-		view.getGraphScrollPane().removeMouseWheelListener(view.getGraphScrollPane().getMouseWheelListeners()[0]);
-*/
+		 * view.setFlGraphPane(); view.getFlGraphPane().setHgap(150);
+		 * view.getGraphScrollPane().setViewportView(view.getGraphPane());
+		 * view.getGraphScrollPane().removeMouseWheelListener(view.getGraphScrollPane().
+		 * getMouseWheelListeners()[0]);
+		 */
 		// view.getLastnameTextfield().setText(model.getLastname());
 	}
-	
 
 	public void initController() {
 		view.getFileMenuLoad().addActionListener(e -> {
@@ -121,14 +121,15 @@ public class Controller {
 					// Double-click detected
 					int index = list.locationToIndex(evt.getPoint());
 					selectedFunction = view.getFunctionList().getSelectedValue();
-					if (selectedFunction.getStartAddr()==0) {
+					if (selectedFunction.getStartAddr() == 0) {
 						System.out.println("x");
-						JOptionPane.showMessageDialog(new JFrame(), selectedFunction.getName()+" is a shared library! Can't display disassembly.", 
+						JOptionPane.showMessageDialog(new JFrame(),
+								selectedFunction.getName() + " is a shared library! Can't display disassembly.",
 								"Shared library", JOptionPane.INFORMATION_MESSAGE);
 					} else {
 						showCFG(selectedFunction);
 					}
-					
+
 				}
 			}
 		});
@@ -157,35 +158,33 @@ public class Controller {
 					JOptionPane.showMessageDialog(new JFrame(), "The symbol table could not be "
 							+ "resolved. As a result, function names have been resolved by function prologue discovery.",
 							"Warning", JOptionPane.WARNING_MESSAGE);
-				} else {
-					for (Function func : this.model.getFunctions()) {
-						view.getFunctionModel().addElement(func);
-						view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
-
-							@Override
-							public Component getListCellRendererComponent(JList list, Object value, int index,
-									boolean isSelected, boolean cellHasFocus) {
-								Component c = super.getListCellRendererComponent(list, value, index, isSelected,
-										cellHasFocus);
-								if (value instanceof Function) {
-									Function function = (Function) value;
-									setText(function.getName());
-									if (function.getStartAddr() == 0) {
-										setForeground(Color.RED);
-									} else {
-										setForeground(Color.BLUE);
-									}
-								} else {
-									// do nothing
-								}
-								return c;
-							}
-
-						});
-					}
-					initFunctionsListener();
-
 				}
+				for (Function func : this.model.getFunctions()) {
+					view.getFunctionModel().addElement(func);
+					view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
+
+						@Override
+						public Component getListCellRendererComponent(JList list, Object value, int index,
+								boolean isSelected, boolean cellHasFocus) {
+							Component c = super.getListCellRendererComponent(list, value, index, isSelected,
+									cellHasFocus);
+							if (value instanceof Function) {
+								Function function = (Function) value;
+								setText(function.getName());
+								if (function.getStartAddr() == 0) {
+									setForeground(Color.RED);
+								} else {
+									setForeground(Color.BLUE);
+								}
+							} else {
+								// do nothing
+							}
+							return c;
+						}
+
+					});
+				}
+				initFunctionsListener();
 
 			} catch (ReadException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Exception", JOptionPane.ERROR_MESSAGE);
@@ -221,7 +220,7 @@ public class Controller {
 						System.out.println("DIR created");
 					}
 				}
-				String exportName = name+".png";
+				String exportName = name + ".png";
 				int exportNumber = 0;
 				String exportFileName = name;
 				String exportSuffix = ".png";
@@ -265,8 +264,6 @@ public class Controller {
 	}
 
 	private void showCFG(Function f) {
-		//view.getGraphTabbedPane().addTab("Main", view.getGraphScrollPane());
-		//view.getGraphPane().removeAll();
 		this.graph = new mxGraph();
 		Object parent = graph.getDefaultParent();
 		graph.getModel().beginUpdate();
@@ -275,19 +272,23 @@ public class Controller {
 			// store a mapping of basic blocks to vertices
 			Map<BasicBlock, Object> blockToVertex = new LinkedHashMap<BasicBlock, Object>();
 			BasicBlock first = findNearest(this.model.getBasicBlocks(), f.getStartAddr());
-			Object root = graph.insertVertex(graph.getDefaultParent(), null, first.instructionsToString(), 240, 150, 80,
-					30);
+			Object root = graph.insertVertex(graph.getDefaultParent(), Integer.toString(first.getFirstAddress()),
+					first.instructionsToString(), 240, 150, 80, 30);
 			blockToVertex.put(first, root);
 			graph.updateCellSize(root);
+			int id = 0;
 			for (int addr : f.getAssociatedAddresses()) {
-				//for(int k:f.getAssociatedAddresses()) {
-				//	System.out.println(f.getStartAddr()+" associated with: "+k);
-				//}
 				if (!(findNearest(this.model.getBasicBlocks(), addr).getFirstAddress() < f.getStartAddr())
 						&& !(findNearest(this.model.getBasicBlocks(), addr).getLastAddress() > f.getEndAddr())) {
 					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
-					Object vertex = graph.insertVertex(graph.getDefaultParent(), null, block.instructionsToString(),
-							240, 150, 80, 30);
+					Object vertex = graph.insertVertex(graph.getDefaultParent(),
+							Integer.toString(block.getFirstAddress()), block.instructionsToString(), 240, 150, 80, 30);
+					blockToVertex.put(block, vertex);
+					graph.updateCellSize(vertex);
+				} else if (f.getStartAddr() == f.getEndAddr()) {
+					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
+					Object vertex = graph.insertVertex(graph.getDefaultParent(),
+							Integer.toString(block.getFirstAddress()), block.instructionsToString(), 240, 150, 80, 30);
 					blockToVertex.put(block, vertex);
 					graph.updateCellSize(vertex);
 				}
@@ -316,19 +317,17 @@ public class Controller {
 			for (int x : first.getAddressReferenceList()) {
 				BasicBlock block1 = this.model.getBasicBlocks().get(x);
 				Object vertex1 = blockToVertex.get(block1);
-				//System.out.println("added");
+				// System.out.println("added");
 				Object e1 = graph.insertEdge(graph.getDefaultParent(), null, "", vertex0, vertex1);
 			}
 
-			graph.setCellsResizable(true);
-			graph.setCellsDisconnectable(false);
-			graph.setEdgeLabelsMovable(false);
-			graph.alignCells(mxConstants.ALIGN_RIGHT);
-
-			// System.out.println("built!");
 		} finally {
 			graph.getModel().endUpdate();
 		}
+		graph.setCellsResizable(true);
+		graph.setCellsDisconnectable(false);
+		graph.setEdgeLabelsMovable(false);
+		graph.alignCells(mxConstants.ALIGN_RIGHT);
 		mxGraphComponent graphComponent = new mxGraphComponent(graph);
 		graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
 			public void mouseReleased(MouseEvent e) {
@@ -341,15 +340,22 @@ public class Controller {
 		});
 		mxIGraphLayout layout = new mxHierarchicalLayout(graph);
 		layout.execute(graph.getDefaultParent());
-		// graph.groupCells();
 		graph.setCellsEditable(false);
 		graphComponent.setConnectable(false);
-		//view.getGraphPane().setLayout(new BorderLayout());
-		//view.getGraphPane().add(graphComponent, BorderLayout.CENTER);
-		//view.getGraphPane().validate();
+
+		// scroll to the root cell
+		Object[] cells = graph.getChildVertices(graph.getDefaultParent());
+		for (Object c : cells) {
+			mxCell cell = (mxCell) c;
+			if (Integer.parseInt(cell.getId()) == f.getStartAddr()) {
+				graphComponent.scrollCellToVisible(cell);
+			}
+		}
+
 		view.addTab(f.getName(), graphComponent);
 		initZoomListeners(graphComponent);
 		graphComponent.validate();
+
 	}
 
 	private void zoomIn(mxGraphComponent graphComponent) {

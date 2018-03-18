@@ -45,6 +45,22 @@ public class Model {
 		return this.instance.getBasicBlocks();
 	}
 	
+	public boolean isKnownAddress(int address) {
+		if(this.instance.getKnownAddresses().contains(address)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	/*
+	public void disassembleFunction(Function f) {
+		if(this.instance.getKnownAddresses().contains(address)) {
+			return true;
+		} else {
+			return false;
+		}
+	}*/
+	
 	//public HashSet<Integer> getAssociatedBlockAddresses(int functionAddr) {
 	//	return this.instance.getAssociatedAddresses(functionAddr);
 	//}
