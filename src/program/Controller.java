@@ -3,6 +3,7 @@ package program;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -23,7 +25,10 @@ import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTable;
+import javax.swing.JViewport;
 import javax.swing.event.ListSelectionEvent;
+import javax.swing.table.DefaultTableModel;
 
 import com.mxgraph.layout.mxCompactTreeLayout;
 import com.mxgraph.layout.mxIGraphLayout;
@@ -34,6 +39,8 @@ import com.mxgraph.util.mxCellRenderer;
 import com.mxgraph.util.mxConstants;
 import com.mxgraph.view.mxGraph;
 import com.mxgraph.view.mxStylesheet;
+
+import capstone.Capstone;
 
 public class Controller {
 
@@ -75,17 +82,11 @@ public class Controller {
 		view.getListScrollPane().setColumnHeaderView(view.getFunctionLabel());
 		view.getEncompassingPane().setRightComponent(view.getMainPane());
 		view.getMainPane().setRightComponent(view.getInstScrollPane());
-		view.getInstScrollPane().setViewportView(view.getInstPanel());
+		//view.getInstScrollPane().setLayout(new BorderLayout());
+		//view.getInstScrollPane().setViewportView(view.getInstPanel());
+		//view.getInstPanel().setLayout(new BorderLayout());
 		view.getMainPane().setLeftComponent(view.getGraphTabbedPane());
 		view.getMainPane().setDividerLocation(450);
-		// view.getMainPane().setLeftComponent(view.getGraphScrollPane());
-		/*
-		 * view.setFlGraphPane(); view.getFlGraphPane().setHgap(150);
-		 * view.getGraphScrollPane().setViewportView(view.getGraphPane());
-		 * view.getGraphScrollPane().removeMouseWheelListener(view.getGraphScrollPane().
-		 * getMouseWheelListeners()[0]);
-		 */
-		// view.getLastnameTextfield().setText(model.getLastname());
 	}
 
 	public void initController() {
@@ -99,26 +100,29 @@ public class Controller {
 			loadFile();
 		});
 		view.getExportButton().addActionListener(e -> export());
-		// view.getCfgButton().addActionListener(e -> openCFG());
-		// view.getLastnameSaveButton().addActionListener(e -> saveLastname());
-		// view.getHello().addActionListener(e -> sayHello());
-		// view.getBye().addActionListener(e -> sayBye());
 	}
 
 	public void initZoomListeners(mxGraphComponent graphComponent) {
 		view.getZoomInButton().addActionListener(e -> zoomIn(graphComponent));
 		view.getZoomOutButton().addActionListener(e -> zoomOut(graphComponent));
-		// view.getLastnameSaveButton().addActionListener(e -> saveLastname());
-		// view.getHello().addActionListener(e -> sayHello());
-		// view.getBye().addActionListener(e -> sayBye());
 	}
 
+	public ArrayList<Capstone.CsInsn> getInstructionList() {
+		ArrayList<Capstone.CsInsn> instructions = new ArrayList<Capstone.CsInsn>();
+		Iterator<BasicBlock> blockIterator = this.model.getBasicBlocks().values().iterator();
+		while (blockIterator.hasNext()) {
+			BasicBlock current = blockIterator.next();
+			instructions.addAll(current.getInstructionList());
+		}
+
+		return instructions;
+	}
+	
 	public void initFunctionsListener() {
 		view.getFunctionList().addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent evt) {
 				JList list = (JList) evt.getSource();
 				if (evt.getClickCount() == 2) {
-					// Double-click detected
 					int index = list.locationToIndex(evt.getPoint());
 					selectedFunction = view.getFunctionList().getSelectedValue();
 					if (selectedFunction.getStartAddr() == 0) {
@@ -127,7 +131,13 @@ public class Controller {
 								selectedFunction.getName() + " is a shared library! Can't display disassembly.",
 								"Shared library", JOptionPane.INFORMATION_MESSAGE);
 					} else {
-						showCFG(selectedFunction);
+						try {
+							showCFG(selectedFunction);
+						} catch(NullPointerException e) {
+							JOptionPane.showMessageDialog(new JFrame(),
+									"This function was not disassembled!",
+									"Critical", JOptionPane.ERROR_MESSAGE);
+						}
 					}
 
 				}
@@ -184,6 +194,11 @@ public class Controller {
 
 					});
 				}
+				InstructionTableModel model = new InstructionTableModel(getInstructionList(),this.model.getFunctions(),this.model.getBasicBlocks());
+				view.getInstTable().setModel(model);
+				view.getInstScrollPane().getViewport().add(view.getInstTable());
+				view.getInstTable().setShowGrid(false);
+				//view.getInstTable().getModel().setValueAt(aValue, rowIndex, columnIndex);
 				initFunctionsListener();
 
 			} catch (ReadException e) {
@@ -272,7 +287,7 @@ public class Controller {
 			// store a mapping of basic blocks to vertices
 			Map<BasicBlock, Object> blockToVertex = new LinkedHashMap<BasicBlock, Object>();
 			BasicBlock first = findNearest(this.model.getBasicBlocks(), f.getStartAddr());
-			Object root = graph.insertVertex(graph.getDefaultParent(), Integer.toString(first.getFirstAddress()),
+			Object root = graph.insertVertex(graph.getDefaultParent(), Integer.toHexString((first.getFirstAddress())),
 					first.instructionsToString(), 240, 150, 80, 30);
 			blockToVertex.put(first, root);
 			graph.updateCellSize(root);
@@ -282,13 +297,13 @@ public class Controller {
 						&& !(findNearest(this.model.getBasicBlocks(), addr).getLastAddress() > f.getEndAddr())) {
 					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
 					Object vertex = graph.insertVertex(graph.getDefaultParent(),
-							Integer.toString(block.getFirstAddress()), block.instructionsToString(), 240, 150, 80, 30);
+							Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
 					blockToVertex.put(block, vertex);
 					graph.updateCellSize(vertex);
 				} else if (f.getStartAddr() == f.getEndAddr()) {
 					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
 					Object vertex = graph.insertVertex(graph.getDefaultParent(),
-							Integer.toString(block.getFirstAddress()), block.instructionsToString(), 240, 150, 80, 30);
+							Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
 					blockToVertex.put(block, vertex);
 					graph.updateCellSize(vertex);
 				}
@@ -333,8 +348,17 @@ public class Controller {
 			public void mouseReleased(MouseEvent e) {
 				Object cell = graphComponent.getCellAt(e.getX(), e.getY());
 				if (cell != null) {
+					mxCell selected = (mxCell) cell;
+					System.out.println(selected.getId());
+					for (int i = 0; i < view.getInstTable().getRowCount(); i++) {
+						for (int j = 0; j < view.getInstTable().getColumnCount(); j++) {
+							if(view.getInstTable().getValueAt(i, 1).equals("0x"+selected.getId())) {
+								scrollToVisibleInstructionBlock(view.getInstTable(),i,
+										model.getBasicBlocks().get(Integer.valueOf(selected.getId(), 16).intValue()).getBlockSize());
+							}
+						}
+					}
 
-					System.out.println(graph.getLabel(cell));
 				}
 			}
 		});
@@ -347,7 +371,7 @@ public class Controller {
 		Object[] cells = graph.getChildVertices(graph.getDefaultParent());
 		for (Object c : cells) {
 			mxCell cell = (mxCell) c;
-			if (Integer.parseInt(cell.getId()) == f.getStartAddr()) {
+			if (cell.getId().equals(Integer.toHexString(f.getStartAddr()))) {
 				graphComponent.scrollCellToVisible(cell);
 			}
 		}
@@ -366,6 +390,26 @@ public class Controller {
 	private void zoomOut(mxGraphComponent graphComponent) {
 		graphComponent.zoomOut();
 		graphComponent.validate();
+	}
+	
+	public void scrollToVisibleInstruction(JTable table, int rowIndex) {
+	    if (!(table.getParent() instanceof JViewport)) return;
+	    JViewport viewport = (JViewport)table.getParent();
+	    Rectangle rect = table.getCellRect(rowIndex, 0, true);
+	    Point pt = viewport.getViewPosition();
+	    rect.setLocation(rect.x-pt.x, rect.y-pt.y);
+	    viewport.scrollRectToVisible(rect);
+	    table.setRowSelectionInterval(rowIndex, rowIndex);
+	}
+	
+	public void scrollToVisibleInstructionBlock(JTable table, int rowIndex, int sizeOfBlock) {
+	    if (!(table.getParent() instanceof JViewport)) return;
+	    JViewport viewport = (JViewport)table.getParent();
+	    Rectangle rect = table.getCellRect(rowIndex, 0, true);
+	    Point pt = viewport.getViewPosition();
+	    rect.setLocation(rect.x-pt.x, rect.y-pt.y);
+	    viewport.scrollRectToVisible(rect);
+	    table.setRowSelectionInterval(rowIndex, rowIndex+sizeOfBlock-1);
 	}
 
 }

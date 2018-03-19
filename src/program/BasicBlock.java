@@ -14,12 +14,25 @@ public class BasicBlock {
 	private HashSet<Integer> addressReferences = new HashSet<Integer>();
 	private HashSet<Integer> loopAddressReferences = new HashSet<Integer>();
 	private HashSet<Integer> outOfScopeReferences = new HashSet<Integer>();
+	private HashSet<Integer> parents = new HashSet<Integer>();
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
 	private int startAddress;
 	private int endAddress;
 
 	public BasicBlock() {
 		instructionList = new ArrayList<Capstone.CsInsn>();
+	}
+	
+	public void addParent(int address) {
+		this.parents.add(address);
+	}
+	
+	public HashSet<Integer> getParents(){
+		return this.parents;
+	}
+	
+	public int getInstructionCount() {
+		return this.instructionList.size();
 	}
 	
 	public ArrayList<Capstone.CsInsn> getInstructionList() {

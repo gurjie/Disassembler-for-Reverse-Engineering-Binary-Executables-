@@ -91,6 +91,7 @@ public class View {
 		mainPane = new JSplitPane();
 		instScrollPane = new JScrollPane();
 		instPanel = new JPanel();
+		instTable = new JTable();
 		// graphScrollPane = new JScrollPane();
 		// graphPane = new JPanel();
 		graphTabbedPane = new JTabbedPane(JTabbedPane.TOP);

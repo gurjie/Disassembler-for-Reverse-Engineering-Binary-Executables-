@@ -18,9 +18,10 @@ import elf.SectionHeader;
 
 public class Disassemble {
 	private Elf elf;
-	private int entry;
+	private int textStart;
 	private byte[] data;
 	private int textSize;
+	private int entry;
 	private byte[] text_bytes;
 	private boolean symtabExists;
 	private boolean strtabExists;
@@ -52,9 +53,10 @@ public class Disassemble {
 		}
 		// System.out.println(elf.header);
 
-		this.entry = (int) getTextSection(elf).fileOffset;
+		this.entry = (int) elf.header.entryPoint-0x400000;
+		this.textStart = (int) getTextSection(elf).fileOffset;
 		this.textSize = (int) getTextSection(elf).size;
-		this.text_bytes = Arrays.copyOfRange(data, entry, (int) (entry + textSize));
+		this.text_bytes = Arrays.copyOfRange(data, textStart, (int) (textStart + textSize));
 		this.cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
 
 		setSections();
@@ -72,6 +74,71 @@ public class Disassemble {
 			disasm(main);
 		} else {
 			disasm(main);
+			Iterator<BasicBlock> blockItr = this.blockList.values().iterator();
+			
+			// give blocks parents
+			while (blockItr.hasNext()) {
+				BasicBlock current = blockItr.next();
+				for(int children : current.getAddressReferenceList()) {
+					if(this.blockList.containsKey(children)) {
+						this.blockList.get(children).addParent(current.getFirstAddress());
+					} else {
+				
+					}
+				}
+			}
+			
+			// find main, the block with no references...
+			// set it as a function
+			Iterator<BasicBlock> testItr = this.blockList.values().iterator();
+			while (testItr.hasNext()) {
+				BasicBlock current = testItr.next();
+				if(current.getParents().size()==0) {
+					for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
+						if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
+							Function ff = new Function("main");
+							ff.setStartAddr(current.getFirstAddress());
+							ff.setEndAddr(entry.getValue().getLastInstruction().address);
+							this.functions.add(ff);
+							ff.setAssociatedAddresses(this.blockList);
+							break;
+						}
+					}
+					System.out.println(Integer.toHexString(current.getFirstAddress())+ " has no parents. Function?" );
+				}
+				//System.out.println(current.instructionsToString());
+			}
+			ArrayList<Integer> knownCallTargets = new ArrayList<Integer>();
+			Function root = this.functions.get(0);
+			for (int addr : root.getAssociatedAddresses()) {
+				if(this.blockList.containsKey(addr)) {
+					if(this.blockList.get(addr).getLastInstruction().mnemonic.equals("call")) {
+						int callAddr = getTargetAddress(this.blockList.get(addr).getLastInstruction());
+						if(callAddr!=-1) {
+							if(!knownCallTargets.contains(callAddr)) {
+								knownCallTargets.add(callAddr);
+								for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(callAddr).entrySet()) {
+									if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
+										System.out.println("ret found!");
+										Function newFunct = new Function(Integer.toHexString((callAddr)));
+										if(this.blockList.containsKey(callAddr)) {
+										newFunct.setStartAddr(this.blockList.get(callAddr).getFirstAddress());
+										newFunct.setEndAddr(entry.getValue().getLastInstruction().address);
+										this.functions.add(newFunct);
+										break;
+										}
+									}
+								}
+							} else {
+								System.out.println("contains!");
+							}
+
+						}
+					}
+				}
+			}
+			System.out.println("there are "+knownCallTargets.size()+" unique call targets. sounds fishy?");
+			// find functions
 			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
 			while (itr4.hasNext()) {
 				BasicBlock current = itr4.next();
@@ -83,30 +150,26 @@ public class Disassemble {
 							function.setStartAddr(current.getFirstAddress());
 							for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
 								if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
-									System.out.println(current.getFirstAddress()+", ret at "+entry.getValue().getFirstAddress());
 									function.setEndAddr(entry.getValue().getLastInstruction().address);
 									break;
 								}
-								/*
-								BasicBlock tmp = retSearchIterator.next();
-								if (tmp.getFirstAddress() != current.getFirstAddress()) {
-									if(tmp.getLastInstruction().mnemonic.equals("ret")) {
-										System.out.println("ret");
-										function.setEndAddr(tmp.getLastAddress());
-										break;
-									}
-								}*/
 							}
-							this.functions.add(function);
+							boolean contains = false;
+							for(Function ff:this.functions) {
+								if(ff.getStartAddr()==current.getFirstAddress()) {
+									contains = true;
+								}
+							}
+							if(contains==false) {
+								this.functions.add(function);
+							}
 						}
 					}
 				}
 
 			}
-			for (Function ff : this.functions) {
-				System.out.println(ff.getStartAddr()+"  ends at: "+ff.getEndAddr());
-			}
 		}
+		System.out.println(this.functions.size());
 
 		Map<Integer, BasicBlock> splitBlockList = new TreeMap<Integer, BasicBlock>();
 		for (int x : this.midBlockTargets) {
@@ -164,7 +227,7 @@ public class Disassemble {
 		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
 		while (itr3.hasNext()) {
 			BasicBlock current = itr3.next();
-			System.out.println(current.instructionsToString());
+			//System.out.println(current.instructionsToString());
 		}
 
 		/*
@@ -233,10 +296,11 @@ public class Disassemble {
 				}
 			}
 		} else {
-			if (discoverMain(entry, textSize, data) == -1) {
+			int discovered = discoverMain(entry, textSize, data);
+			if (discovered == -1) {
 				throw new MainDiscoveryException("Couldn't resolve main due to discovery heuristic failing!");
 			} else {
-				return discoverMain(entry, textSize, data);
+				return discovered;
 			}
 		}
 		throw new MainDiscoveryException("Couldn't resolve main: Issue resolving from symbol table.");
@@ -301,12 +365,12 @@ public class Disassemble {
 			System.out.println("ffff");
 		}
 		BasicBlock current = new BasicBlock();
-		while (address < entry + textSize) {
+		while (address < textStart + textSize) {
 			if (this.knownAddresses.contains(address)) {
 				return current;
 			}
 			Capstone.CsInsn instruction;
-			instruction = disasmInstructionAtAddress(address, data, entry, textSize);
+			instruction = disasmInstructionAtAddress(address, data, textStart, textSize);
 			current.addInstruction(instruction);
 
 			if (instruction.mnemonic.equals("ret")) {
@@ -316,7 +380,7 @@ public class Disassemble {
 			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
 				int jumpAddr = getTargetAddress(instruction) - 0x400000;
 				if (jumpAddr != -1) {
-					if (jumpAddr >= entry && jumpAddr <= entry + textSize) {
+					if (jumpAddr >= textStart && jumpAddr <= textStart + textSize) {
 						if (!this.knownAddresses.contains(jumpAddr)) {
 							this.possibleTargets.add(jumpAddr);
 							current.addAddressReference(jumpAddr + 0x400000);
@@ -611,45 +675,43 @@ public class Disassemble {
 	 * @throws MainDiscoveryException  if heuristic completely failed
 	 */
 	private int discoverMain(int entry, int textSize, byte[] data) throws MainDiscoveryException {
-		try {
-		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>();
-		text_bytes = Arrays.copyOfRange(data, entry, (int) (entry + 15));
-		Capstone.CsInsn[] first = cs.disasm(text_bytes, entry, 1);
+		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>(); // list of instructions
+		byte[] first_bytes = Arrays.copyOfRange(data, entry, entry + 15);
+		Capstone.CsInsn[] first = cs.disasm(first_bytes, entry, 1); // first instruction disassembled
 		Capstone.CsInsn instruction = first[0];
 		startInstructions.add(instruction);
-		int InstSize = instruction.size;
+		int instSize = instruction.size;
 		while (!instruction.mnemonic.equals("hlt")) {
-			text_bytes = Arrays.copyOfRange(data, entry + InstSize, (int) (entry + 100));
-			Capstone.CsInsn[] allInsn = cs.disasm(text_bytes, entry + InstSize, 1);
-			startInstructions.add(allInsn[0]);
+			// disassemble until hlt reached
+			first_bytes = Arrays.copyOfRange(data, entry+instSize, (int) (entry + 15+instSize));
+			Capstone.CsInsn[] allInsn = cs.disasm(first_bytes, entry + instSize, 1);
 			instruction = allInsn[0];
-			InstSize += instruction.size;
+			startInstructions.add(instruction);
+			instSize += instruction.size;
 		}
-		int index = startInstructions.size() - 2;
+		int index = startInstructions.size() - 1;
 		while (!startInstructions.get(index).mnemonic.equals("call")) {
-			index -= 1;
+			index--;
 		}
 		if (startInstructions.get(index).mnemonic.equals("call")) {
 			if (startInstructions.get(index - 1).mnemonic.equals("mov")) {
-				System.out.println(startInstructions.get(index - 1).opStr);
 				String[] operands = startInstructions.get(index - 1).opStr.split(",");
 				for (String s : operands) {
 					if (resolveAddressFromString(s) != -1) {
 						return (int) resolveAddressFromString(s) - 0x400000;
-					}
+					} 
 				}
-				return -1;
+				throw new MainDiscoveryException("Couldn't find main: expected address in register before call to libc_start_main");
 			} else if (startInstructions.get(index - 1).mnemonic.equals("push")) {
 				return (int) resolveAddressFromString(startInstructions.get(index - 1).opStr) - 0x400000;
 			} else {
-				return -1;
+				throw new MainDiscoveryException("Couldn't find main: expected moving of main address into register before libc_start_main called,"
+						+ "wasn't found at instruction proceeding call.");
 			}
+		} else {
+			throw new MainDiscoveryException("Couldnt find main: expected call instruction before hlt in _start");
 		}
-		return -1;
-		}
-		catch(Exception e) {
-			throw new MainDiscoveryException("The heuristic for discovering the main function failed");
-		}
+	
 	}
 
 	// perform a single instruction linear sweep for testing purposes
