@@ -293,20 +293,12 @@ public class Controller {
 			graph.updateCellSize(root);
 			int id = 0;
 			for (int addr : f.getAssociatedAddresses()) {
-				if (!(findNearest(this.model.getBasicBlocks(), addr).getFirstAddress() < f.getStartAddr())
-						&& !(findNearest(this.model.getBasicBlocks(), addr).getLastAddress() > f.getEndAddr())) {
+				
 					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
 					Object vertex = graph.insertVertex(graph.getDefaultParent(),
 							Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
 					blockToVertex.put(block, vertex);
 					graph.updateCellSize(vertex);
-				} else if (f.getStartAddr() == f.getEndAddr()) {
-					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
-					Object vertex = graph.insertVertex(graph.getDefaultParent(),
-							Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
-					blockToVertex.put(block, vertex);
-					graph.updateCellSize(vertex);
-				}
 			}
 
 			// for every basic block connect its reference addresses

@@ -88,15 +88,14 @@ public class Disassemble {
 				}
 			}
 			
-			// find main, the block with no references...
-			// set it as a function
+			// set blocks with 0 parents as a function
 			Iterator<BasicBlock> testItr = this.blockList.values().iterator();
 			while (testItr.hasNext()) {
 				BasicBlock current = testItr.next();
 				if(current.getParents().size()==0) {
 					for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
 						if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
-							Function ff = new Function("main");
+							Function ff = new Function(Integer.toHexString(current.getFirstAddress()));
 							ff.setStartAddr(current.getFirstAddress());
 							ff.setEndAddr(entry.getValue().getLastInstruction().address);
 							this.functions.add(ff);
@@ -104,40 +103,12 @@ public class Disassemble {
 							break;
 						}
 					}
-					System.out.println(Integer.toHexString(current.getFirstAddress())+ " has no parents. Function?" );
+					//System.out.println(Integer.toHexString(current.getFirstAddress())+ " has no parents. Function?" );
 				}
 				//System.out.println(current.instructionsToString());
 			}
-			ArrayList<Integer> knownCallTargets = new ArrayList<Integer>();
-			Function root = this.functions.get(0);
-			for (int addr : root.getAssociatedAddresses()) {
-				if(this.blockList.containsKey(addr)) {
-					if(this.blockList.get(addr).getLastInstruction().mnemonic.equals("call")) {
-						int callAddr = getTargetAddress(this.blockList.get(addr).getLastInstruction());
-						if(callAddr!=-1) {
-							if(!knownCallTargets.contains(callAddr)) {
-								knownCallTargets.add(callAddr);
-								for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(callAddr).entrySet()) {
-									if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
-										System.out.println("ret found!");
-										Function newFunct = new Function(Integer.toHexString((callAddr)));
-										if(this.blockList.containsKey(callAddr)) {
-										newFunct.setStartAddr(this.blockList.get(callAddr).getFirstAddress());
-										newFunct.setEndAddr(entry.getValue().getLastInstruction().address);
-										this.functions.add(newFunct);
-										break;
-										}
-									}
-								}
-							} else {
-								System.out.println("contains!");
-							}
-
-						}
-					}
-				}
-			}
-			System.out.println("there are "+knownCallTargets.size()+" unique call targets. sounds fishy?");
+			
+			//System.out.println("there are "+knownCallTargets.size()+" unique call targets. sounds fishy?");
 			// find functions
 			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
 			while (itr4.hasNext()) {
@@ -169,31 +140,44 @@ public class Disassemble {
 
 			}
 		}
-		System.out.println(this.functions.size());
 
+		Iterator<BasicBlock> splitBlock2 = this.blockList.values().iterator();
 		Map<Integer, BasicBlock> splitBlockList = new TreeMap<Integer, BasicBlock>();
-		for (int x : this.midBlockTargets) {
-			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
-			while (itr4.hasNext()) {
-				BasicBlock temp = itr4.next();
-				if (temp.containsAddress(x + 0x400000)) {
-					HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
-					HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
-					initialLoopReferences.addAll(temp.getLoopAddressReferences());
-					initialAddrReferences.addAll(temp.getAddressReferenceList());
-					ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(
-							temp.getInstructionList().subList(0, temp.indexOfAddress(x + 0x400000)));
-					ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(temp.getInstructionList()
-							.subList(temp.indexOfAddress(x + 0x400000), temp.getInstructionList().size()));
-					this.blockList.get(temp.getFirstAddress()).overwriteInstructions(initialInsns,
-							(int) targetList.get(0).address);
-					// System.out.println(this.blockList.get(temp.getFirstAddress()).instructionsToString());
-					BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after split
-					jumpBlock.setInstructionList(targetList);
-					jumpBlock.setReferences(initialAddrReferences);
-					jumpBlock.setLoopReferences(initialLoopReferences);
-					splitBlockList.put(jumpBlock.getFirstAddress(), jumpBlock);
+
+		while (splitBlock2.hasNext()) {
+			BasicBlock current = splitBlock2.next();
+			if(current.getBlockSize()!=0) {
+			if(current.getLastInstruction().mnemonic.equals("jmp")||isConditionalCti(current.getLastInstruction())) {
+				int target = getTargetAddress(current.getLastInstruction());
+				if(target!=-1) {
+					if(!this.blockList.containsKey(target)) {
+						System.out.println(current.getLastInstruction().mnemonic+" "+current.getLastInstruction().opStr);
+						Iterator<BasicBlock> targetIt = this.blockList.values().iterator();
+						while (targetIt.hasNext()) {
+							BasicBlock tmp = targetIt.next();
+							if(tmp.getBlockSize()!=0) {
+							if(tmp.containsAddress(target)) {
+								HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
+								HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
+								initialLoopReferences.addAll(tmp.getLoopAddressReferences());
+								initialAddrReferences.addAll(tmp.getAddressReferenceList());
+								ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(
+										tmp.getInstructionList().subList(0, tmp.indexOfAddress(target)));
+								ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(tmp.getInstructionList()
+										.subList(tmp.indexOfAddress(target), tmp.getInstructionList().size()));
+								this.blockList.get(tmp.getFirstAddress()).overwriteInstructions(initialInsns,
+										(int) targetList.get(0).address);
+								BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after split
+								jumpBlock.setInstructionList(targetList);
+								jumpBlock.setReferences(initialAddrReferences);
+								jumpBlock.setLoopReferences(initialLoopReferences);
+								splitBlockList.put(jumpBlock.getFirstAddress(), jumpBlock);
+							}
+						}}
+						
+					}
 				}
+			}
 			}
 		}
 
@@ -201,7 +185,7 @@ public class Disassemble {
 		while (splitBlockIt.hasNext()) {
 			BasicBlock current = splitBlockIt.next();
 			this.blockList.put(current.getFirstAddress(), current);
-			// System.out.println("/x//////"+current.instructionsToString());
+			//System.out.println("/x//////"+current.instructionsToString());
 		}
 
 		Iterator<BasicBlock> itr = this.blockList.values().iterator();
@@ -227,44 +211,8 @@ public class Disassemble {
 		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
 		while (itr3.hasNext()) {
 			BasicBlock current = itr3.next();
-			//System.out.println(current.instructionsToString());
+			System.out.println(current.instructionsToString());
 		}
-
-		/*
-		 * for(int x: this.midBlockTargets) { Iterator<BasicBlock> itr4 =
-		 * this.blockList.values().iterator(); while (itr4.hasNext()) { BasicBlock temp
-		 * = itr4.next(); if(temp.containsAddress(x+0x400000)) { HashSet<Integer>
-		 * initialAddrReferences = new HashSet<Integer>(); HashSet<Integer>
-		 * initialLoopReferences = new HashSet<Integer>();
-		 * initialLoopReferences.addAll(temp.getLoopAddressReferences());
-		 * initialAddrReferences.addAll(temp.getAddressReferenceList()); for(int
-		 * i:initialAddrReferences) {
-		 * System.out.println(Integer.toHexString(i-0x400000)); } // Split the blocks
-		 * instructions into two lists to assign to new blocks
-		 * ArrayList<Capstone.CsInsn> initialInsns = new
-		 * ArrayList<Capstone.CsInsn>(temp.getInstructionList().subList(0,
-		 * temp.indexOfAddress(x+0x400000))); ArrayList<Capstone.CsInsn> targetList =
-		 * new ArrayList<Capstone.CsInsn>(temp.getInstructionList().subList(temp.
-		 * indexOfAddress(x+0x400000), temp.getInstructionList().size()));
-		 * System.out.println(Long.toHexString(x)+" block found::::: ");
-		 * System.out.print(temp.instructionsToString());
-		 * System.out.println("first list: "); for(Capstone.CsInsn i:initialInsns) {
-		 * System.out.println(i.mnemonic+"   "+i.opStr); }
-		 * System.out.println("jump list: "); for(Capstone.CsInsn i:targetList) {
-		 * System.out.println(i.mnemonic+"   "+i.opStr); } System.out.println(); //
-		 * Reset original lists' references and instructions, overwriting with
-		 * initialInsn // and adding reference to the first address of the new list...
-		 * this.blockList.get(temp.getFirstAddress()).overwriteInstructions(
-		 * initialInsns, (int) targetList.get(0).address);
-		 * System.out.println(this.blockList.get(temp.getFirstAddress()).
-		 * instructionsToString()); BasicBlock jumpBlock = new BasicBlock(); // to hold
-		 * instructions at and after split jumpBlock.setInstructionList(targetList);
-		 * jumpBlock.setReferences(initialAddrReferences);
-		 * jumpBlock.setLoopReferences(initialLoopReferences);
-		 * System.out.println(jumpBlock.instructionsToString());
-		 * 
-		 * } } }
-		 */
 
 	}
 
@@ -306,15 +254,6 @@ public class Disassemble {
 		throw new MainDiscoveryException("Couldn't resolve main: Issue resolving from symbol table.");
 	}
 
-	private void disasmFunction(int address) {
-		for (int i = 0; i < this.possibleTargets.size(); i++) {
-			BasicBlock current = buildBlock(this.possibleTargets.get(i));
-			if (current.getBlockSize() != 0) {
-				this.blockList.put(current.getFirstAddress(), current);
-			}
-		}
-	}
-
 	/**
 	 * For all possible target disassembly addresses in the list, build a BasicBlock
 	 * block by calling buildBlock, which will build a basic block of instructions
@@ -327,6 +266,9 @@ public class Disassemble {
 	private void disasm(int address) {
 		for (int i = 0; i < this.possibleTargets.size(); i++) {
 			BasicBlock current = buildBlock(this.possibleTargets.get(i));
+			if(current.getInstructionList().size()!=0&&current.getFirstAddress()==4205752) {
+				System.out.println("adaggdagadgdgad");
+			}
 			if (current.getBlockSize() != 0) {
 				this.blockList.put(current.getFirstAddress(), current);
 			}
@@ -361,9 +303,7 @@ public class Disassemble {
 	 * @return the current basic block of instructions
 	 */
 	private BasicBlock buildBlock(int address) {
-		if (address == 4196832 - 0x400000) {
-			System.out.println("ffff");
-		}
+
 		BasicBlock current = new BasicBlock();
 		while (address < textStart + textSize) {
 			if (this.knownAddresses.contains(address)) {
@@ -372,6 +312,16 @@ public class Disassemble {
 			Capstone.CsInsn instruction;
 			instruction = disasmInstructionAtAddress(address, data, textStart, textSize);
 			current.addInstruction(instruction);
+			/*
+			if(current.getFirstAddress()==4205746) {
+				System.out.println(x);
+			}*/
+			/*
+			if (address == 4205752 - 0x400000) {
+				System.out.println(current.getFirstAddress());
+				System.out.println("first instruction of cb8 is "+instruction.mnemonic);
+				System.out.println(current.getBlockSize());
+			}*/
 
 			if (instruction.mnemonic.equals("ret")) {
 				return current;
@@ -383,14 +333,19 @@ public class Disassemble {
 					if (jumpAddr >= textStart && jumpAddr <= textStart + textSize) {
 						if (!this.knownAddresses.contains(jumpAddr)) {
 							this.possibleTargets.add(jumpAddr);
-							current.addAddressReference(jumpAddr + 0x400000);
+							if(!instruction.mnemonic.equals("call")) {
+								current.addAddressReference(jumpAddr + 0x400000);
+							} 
 						} else if (this.knownAddresses.contains(jumpAddr)
 								&& !this.blockList.containsKey(jumpAddr + 0x400000)) {
 							this.midBlockTargets.add(jumpAddr);
-							current.addAddressReference(jumpAddr + 0x400000);
+							if(!instruction.mnemonic.equals("call")) {
+								current.addAddressReference(jumpAddr + 0x400000);
+							}
 						} else {
-							current.addAddressReference(jumpAddr + 0x400000);
-						}
+							if(!instruction.mnemonic.equals("call")) {
+								current.addAddressReference(jumpAddr + 0x400000);
+							}						}
 					} else {
 						current.addAddressReferenceOutOfScope(jumpAddr);
 					}
