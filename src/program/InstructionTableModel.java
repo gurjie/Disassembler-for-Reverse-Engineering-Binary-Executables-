@@ -16,12 +16,15 @@ public class InstructionTableModel extends AbstractTableModel {
 	private ArrayList<Capstone.CsInsn> instructions;
 	private List<Function> functions;
 	private Map<Integer, BasicBlock> blocks;
-	public InstructionTableModel(ArrayList<Capstone.CsInsn> instructions, List<Function> list, Map<Integer, BasicBlock> blocks) {
+	
+	public InstructionTableModel() {
+	
+	}
+	
+	public void setModel(ArrayList<Capstone.CsInsn> instructions, List<Function> list, Map<Integer, BasicBlock> blocks) {
 		this.instructions = instructions; 
 		this.functions = list; 
 		this.blocks = blocks;
-		
-		
 	}
 	
 	@Override

@@ -5,19 +5,19 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import javax.imageio.ImageIO;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JFileChooser;
@@ -27,10 +27,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JViewport;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.table.DefaultTableModel;
-
-import com.mxgraph.layout.mxCompactTreeLayout;
+import javax.swing.SwingUtilities;
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.model.mxCell;
@@ -38,7 +35,6 @@ import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.util.mxCellRenderer;
 import com.mxgraph.util.mxConstants;
 import com.mxgraph.view.mxGraph;
-import com.mxgraph.view.mxStylesheet;
 
 import capstone.Capstone;
 
@@ -49,6 +45,10 @@ public class Controller {
 	private mxGraph graph;
 	private boolean loaded;
 	private Function selectedFunction;
+	public final int COPY_FROM_ADDR = 1;
+    public final int COPY_FROM_MNEUMONIC = 2;
+    public final int COPY_FROM_FUNCT_NAME = 3;
+
 
 	public Controller(Model m, View v) {
 		model = m;
@@ -82,9 +82,13 @@ public class Controller {
 		view.getListScrollPane().setColumnHeaderView(view.getFunctionLabel());
 		view.getEncompassingPane().setRightComponent(view.getMainPane());
 		view.getMainPane().setRightComponent(view.getInstScrollPane());
-		//view.getInstScrollPane().setLayout(new BorderLayout());
-		//view.getInstScrollPane().setViewportView(view.getInstPanel());
-		//view.getInstPanel().setLayout(new BorderLayout());
+		view.getInstScrollPane().getViewport().add(view.getInstTable());
+		view.getInstTable().setShowGrid(false);
+		view.getPopup().add(view.getExportSelected());
+		view.getPopup().addSeparator();
+		view.getPopup().add(view.getCopyInstructions());
+		view.getPopup().add(view.getCopy());
+		view.getPopup().add(view.getCopyAll());
 		view.getMainPane().setLeftComponent(view.getGraphTabbedPane());
 		view.getMainPane().setDividerLocation(450);
 	}
@@ -100,6 +104,106 @@ public class Controller {
 			loadFile();
 		});
 		view.getExportButton().addActionListener(e -> export());
+
+		view.getExportSelected().addActionListener(e -> {
+			// do copy logic
+			System.out.println("exporting selected...");
+		});
+		
+		
+		view.getCopy().addActionListener(e -> {
+			// do copy logic
+			selectedInstructionsToClipboard(this.COPY_FROM_ADDR);
+		});
+		
+		view.getCopyAll().addActionListener(e -> {
+			// do copy logic
+			selectedInstructionsToClipboard(this.COPY_FROM_FUNCT_NAME);
+
+		});
+		
+		view.getCopyInstructions().addActionListener(e -> {
+			// do copy logic
+			selectedInstructionsToClipboard(this.COPY_FROM_MNEUMONIC);
+
+		});
+
+		view.getInstTable().addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				showPopup(e);
+			}
+		});
+	}
+	
+	public void exportSelected () {
+	
+	}
+	
+	public void selectedInstructionsToClipboard(int id ) {
+		StringSelection selection = new StringSelection(buildSelectionString(view.getInstTable().getSelectedRows(), 
+				id));
+		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+		clipboard.setContents(selection, selection);
+	}
+	
+	public String buildSelectionString(int[] selectedRows, int id) {
+		String allSelected = "", row = "";
+		for(int x :selectedRows) {
+			switch (id) {
+				case COPY_FROM_ADDR:
+					row = String.format("%s\t%s\t%s\n", 
+							view.getInstTable().getValueAt(x, 1), 
+							view.getInstTable().getValueAt(x, 2), 
+							view.getInstTable().getValueAt(x, 3));	
+					break;
+				case COPY_FROM_MNEUMONIC:
+					row = String.format("%s\t%s\n", view.getInstTable().getValueAt(x, 2)
+							, view.getInstTable().getValueAt(x, 3));	
+					break;
+				case COPY_FROM_FUNCT_NAME:
+					if(!view.getInstTable().getValueAt(x,0).equals("-")) {
+						allSelected = allSelected.concat("\n"+"----------"+
+					view.getInstTable().getValueAt(x,0)+"----------\n");
+					}
+					row = String.format("%s\t%s\t%s\n", 
+							view.getInstTable().getValueAt(x, 1), 
+							view.getInstTable().getValueAt(x, 2), 
+							view.getInstTable().getValueAt(x, 3));
+					break;
+				default:
+			}	
+			allSelected=allSelected.concat(row);
+		}
+		return allSelected;
+		
+	}
+	
+	public void selectedInstructionsWithFunctNameToClipboard() {
+		String allSelected = "";
+		int[] selectedRows = view.getInstTable().getSelectedRows();
+		String row = "";
+		for(int x :selectedRows) {
+			row = String.format("%s\t%s\t%s\n", view.getInstTable().getValueAt(x, 1), view.getInstTable().getValueAt(x, 2)
+					, view.getInstTable().getValueAt(x, 3));	
+			allSelected=allSelected.concat(row);
+		}
+		StringSelection selection = new StringSelection(allSelected);
+		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+		clipboard.setContents(selection, selection);
+	}
+	
+	public void showPopup(MouseEvent e) {
+		if (SwingUtilities.isRightMouseButton(e) == true) {
+			view.getPopup().show(e.getComponent(), e.getX(), e.getY());
+		}
+		
+	}
+	
+	public void initInstTableModel() {
+		view.getModel().setModel(getInstructionList(), this.model.getFunctions(), this.model.getBasicBlocks());
+		view.getInstTable().setModel(view.getModel());
+
 	}
 
 	public void initZoomListeners(mxGraphComponent graphComponent) {
@@ -117,7 +221,7 @@ public class Controller {
 
 		return instructions;
 	}
-	
+
 	public void initFunctionsListener() {
 		view.getFunctionList().addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent evt) {
@@ -133,9 +237,8 @@ public class Controller {
 					} else {
 						try {
 							showCFG(selectedFunction);
-						} catch(NullPointerException e) {
-							JOptionPane.showMessageDialog(new JFrame(),
-									"This function was not disassembled!",
+						} catch (NullPointerException e) {
+							JOptionPane.showMessageDialog(new JFrame(), "This function was not disassembled!",
 									"Critical", JOptionPane.ERROR_MESSAGE);
 						}
 					}
@@ -166,7 +269,8 @@ public class Controller {
 				}
 				if (!this.model.symTabExists()) {
 					JOptionPane.showMessageDialog(new JFrame(), "The symbol table could not be "
-							+ "resolved. As a result, function names have been resolved by function prologue discovery.",
+							+ "resolved. As a result, only functions reachable from main \nhave been disassembled. "
+							+ "Functions discovered are basic blocks with no parents.",
 							"Warning", JOptionPane.WARNING_MESSAGE);
 				}
 				for (Function func : this.model.getFunctions()) {
@@ -194,11 +298,7 @@ public class Controller {
 
 					});
 				}
-				InstructionTableModel model = new InstructionTableModel(getInstructionList(),this.model.getFunctions(),this.model.getBasicBlocks());
-				view.getInstTable().setModel(model);
-				view.getInstScrollPane().getViewport().add(view.getInstTable());
-				view.getInstTable().setShowGrid(false);
-				//view.getInstTable().getModel().setValueAt(aValue, rowIndex, columnIndex);
+				initInstTableModel();
 				initFunctionsListener();
 
 			} catch (ReadException e) {
@@ -293,12 +393,12 @@ public class Controller {
 			graph.updateCellSize(root);
 			int id = 0;
 			for (int addr : f.getAssociatedAddresses()) {
-				
-					BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
-					Object vertex = graph.insertVertex(graph.getDefaultParent(),
-							Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
-					blockToVertex.put(block, vertex);
-					graph.updateCellSize(vertex);
+
+				BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
+				Object vertex = graph.insertVertex(graph.getDefaultParent(),
+						Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
+				blockToVertex.put(block, vertex);
+				graph.updateCellSize(vertex);
 			}
 
 			// for every basic block connect its reference addresses
@@ -341,17 +441,17 @@ public class Controller {
 				Object cell = graphComponent.getCellAt(e.getX(), e.getY());
 				if (cell != null) {
 					mxCell selected = (mxCell) cell;
-					System.out.println(selected.getId());
 					for (int i = 0; i < view.getInstTable().getRowCount(); i++) {
 						for (int j = 0; j < view.getInstTable().getColumnCount(); j++) {
-							if(view.getInstTable().getValueAt(i, 1).equals("0x"+selected.getId())) {
-								scrollToVisibleInstructionBlock(view.getInstTable(),i,
-										model.getBasicBlocks().get(Integer.valueOf(selected.getId(), 16).intValue()).getBlockSize());
+							if (view.getInstTable().getValueAt(i, 1).equals("0x" + selected.getId())) {
+								scrollToVisibleInstructionBlock(view.getInstTable(), i, model.getBasicBlocks()
+										.get(Integer.valueOf(selected.getId(), 16).intValue()).getBlockSize());
 							}
 						}
 					}
 
 				}
+
 			}
 		});
 		mxIGraphLayout layout = new mxHierarchicalLayout(graph);
@@ -383,25 +483,27 @@ public class Controller {
 		graphComponent.zoomOut();
 		graphComponent.validate();
 	}
-	
+
 	public void scrollToVisibleInstruction(JTable table, int rowIndex) {
-	    if (!(table.getParent() instanceof JViewport)) return;
-	    JViewport viewport = (JViewport)table.getParent();
-	    Rectangle rect = table.getCellRect(rowIndex, 0, true);
-	    Point pt = viewport.getViewPosition();
-	    rect.setLocation(rect.x-pt.x, rect.y-pt.y);
-	    viewport.scrollRectToVisible(rect);
-	    table.setRowSelectionInterval(rowIndex, rowIndex);
+		if (!(table.getParent() instanceof JViewport))
+			return;
+		JViewport viewport = (JViewport) table.getParent();
+		Rectangle rect = table.getCellRect(rowIndex, 0, true);
+		Point pt = viewport.getViewPosition();
+		rect.setLocation(rect.x - pt.x, rect.y - pt.y);
+		viewport.scrollRectToVisible(rect);
+		table.setRowSelectionInterval(rowIndex, rowIndex);
 	}
-	
+
 	public void scrollToVisibleInstructionBlock(JTable table, int rowIndex, int sizeOfBlock) {
-	    if (!(table.getParent() instanceof JViewport)) return;
-	    JViewport viewport = (JViewport)table.getParent();
-	    Rectangle rect = table.getCellRect(rowIndex, 0, true);
-	    Point pt = viewport.getViewPosition();
-	    rect.setLocation(rect.x-pt.x, rect.y-pt.y);
-	    viewport.scrollRectToVisible(rect);
-	    table.setRowSelectionInterval(rowIndex, rowIndex+sizeOfBlock-1);
+		if (!(table.getParent() instanceof JViewport))
+			return;
+		JViewport viewport = (JViewport) table.getParent();
+		Rectangle rect = table.getCellRect(rowIndex, 0, true);
+		Point pt = viewport.getViewPosition();
+		rect.setLocation(rect.x - pt.x, rect.y - pt.y);
+		viewport.scrollRectToVisible(rect);
+		table.setRowSelectionInterval(rowIndex, rowIndex + sizeOfBlock - 1);
 	}
 
 }

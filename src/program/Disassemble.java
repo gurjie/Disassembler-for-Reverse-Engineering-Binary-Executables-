@@ -82,9 +82,7 @@ public class Disassemble {
 				for(int children : current.getAddressReferenceList()) {
 					if(this.blockList.containsKey(children)) {
 						this.blockList.get(children).addParent(current.getFirstAddress());
-					} else {
-				
-					}
+					} 
 				}
 			}
 			
@@ -95,7 +93,13 @@ public class Disassemble {
 				if(current.getParents().size()==0) {
 					for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
 						if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
-							Function ff = new Function(Integer.toHexString(current.getFirstAddress()));
+							Function ff;
+							if((current.getFirstAddress()-0x400000)==main) {
+								ff = new Function("main");
+							} else {
+								ff = new Function(Integer.toHexString(current.getFirstAddress()));
+
+							}
 							ff.setStartAddr(current.getFirstAddress());
 							ff.setEndAddr(entry.getValue().getLastInstruction().address);
 							this.functions.add(ff);
@@ -110,6 +114,7 @@ public class Disassemble {
 			
 			//System.out.println("there are "+knownCallTargets.size()+" unique call targets. sounds fishy?");
 			// find functions
+			/*
 			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
 			while (itr4.hasNext()) {
 				BasicBlock current = itr4.next();
@@ -133,12 +138,13 @@ public class Disassemble {
 							}
 							if(contains==false) {
 								this.functions.add(function);
+								System.out.println("added");
 							}
 						}
 					}
 				}
 
-			}
+			}*/
 		}
 
 		Iterator<BasicBlock> splitBlock2 = this.blockList.values().iterator();
@@ -151,7 +157,6 @@ public class Disassemble {
 				int target = getTargetAddress(current.getLastInstruction());
 				if(target!=-1) {
 					if(!this.blockList.containsKey(target)) {
-						System.out.println(current.getLastInstruction().mnemonic+" "+current.getLastInstruction().opStr);
 						Iterator<BasicBlock> targetIt = this.blockList.values().iterator();
 						while (targetIt.hasNext()) {
 							BasicBlock tmp = targetIt.next();
@@ -208,11 +213,12 @@ public class Disassemble {
 			}
 		}
 
+		/*
 		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
 		while (itr3.hasNext()) {
 			BasicBlock current = itr3.next();
 			System.out.println(current.instructionsToString());
-		}
+		}*/
 
 	}
 
@@ -404,6 +410,7 @@ public class Disassemble {
 				this.symbolAddresses.add(current.getAddress()); // Addresses of any symbols added
 			}
 			for (SymbolEntry sym : this.symbolEntries) {
+				System.out.println(sym.getName()+" "+sym.getType());
 				addFunctionFromSymtab(sym);
 			}
 		}

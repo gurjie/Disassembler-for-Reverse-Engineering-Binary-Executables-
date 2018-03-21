@@ -14,6 +14,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
@@ -58,6 +59,12 @@ public class View {
 	private DefaultListModel<String> sectionModel;
 	private DefaultListModel<Function> functionModel;
 	private JTabbedPane graphTabbedPane;
+	private JPopupMenu popup;
+	private JMenuItem exportSelected;
+	private JMenuItem copy;
+	private JMenuItem copyAll;
+	private JMenuItem copyInstructions;
+	private InstructionTableModel InstructionTableModel;
 
 	public View(String title) {
 		frame = new JFrame(title);
@@ -95,8 +102,40 @@ public class View {
 		// graphScrollPane = new JScrollPane();
 		// graphPane = new JPanel();
 		graphTabbedPane = new JTabbedPane(JTabbedPane.TOP);
+		popup = new JPopupMenu();
+		exportSelected = new JMenuItem("Export selected...");
+		copy = new JMenuItem("Copy (addr, mneumonic, opstring)");
+		copyAll = new JMenuItem("Copy (function, addr, mneumonic, opstring)");
+		copyInstructions = new JMenuItem("Copy (mneumonic, opstring)");
+		InstructionTableModel = new InstructionTableModel();
 	}
 
+	
+	public JPopupMenu getPopup() {
+		return popup;
+	}
+	
+	public JMenuItem getExportSelected() {
+		return exportSelected;
+	}
+
+	public JMenuItem getCopy() {
+		return copy;
+	}
+
+	public JMenuItem getCopyAll() {
+		return copyAll;
+	}
+	
+	public JMenuItem getCopyInstructions() {
+		return copyInstructions;
+	}
+
+	public InstructionTableModel getModel() {
+		return InstructionTableModel;
+	}
+
+	
 	public JTabbedPane getGraphTabbedPane() {
 		return graphTabbedPane;
 	}
