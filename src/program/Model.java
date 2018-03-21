@@ -52,6 +52,15 @@ public class Model {
 			return false;
 		}
 	}
+	
+	public String getHexRepresentationSpaces(int first, int last, boolean spaces) {
+		return this.instance.getHexRepresentation(first-0x400000, last-0x400000, spaces);
+	}
+	
+	public int getMain() {
+		return this.instance.getMain();
+	}
+
 	/*
 	public void disassembleFunction(Function f) {
 		if(this.instance.getKnownAddresses().contains(address)) {

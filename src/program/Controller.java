@@ -107,6 +107,7 @@ public class Controller {
 
 		view.getExportSelected().addActionListener(e -> {
 			// do copy logic
+			exportSelected();
 			System.out.println("exporting selected...");
 		});
 		
@@ -137,7 +138,24 @@ public class Controller {
 	}
 	
 	public void exportSelected () {
-	
+		ExportView exportView = new ExportView();
+		ExportDialogue instance = new ExportDialogue(this.view.getFrame(),exportView,
+				"Export",view.getInstTable(),this.model);
+		instance.pack();
+		instance.setVisible(true);
+		/*
+		 JFileChooser chooser = new JFileChooser();
+		    chooser.setCurrentDirectory(new java.io.File("."));
+		    chooser.setDialogTitle("choosertitle");
+		    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		    chooser.setAcceptAllFileFilterUsed(false);
+
+		    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+		      System.out.println("getCurrentDirectory(): " + chooser.getCurrentDirectory());
+		    } else {
+		      System.out.println("No Selection ");
+		    }
+		    */
 	}
 	
 	public void selectedInstructionsToClipboard(int id ) {
@@ -297,6 +315,11 @@ public class Controller {
 						}
 
 					});
+				}
+				for(Function f : this.model.getFunctions()) {
+					if(f.getStartAddr()-0x400000==this.model.getMain()) {
+						showCFG(f);
+					}
 				}
 				initInstTableModel();
 				initFunctionsListener();
@@ -499,10 +522,19 @@ public class Controller {
 		if (!(table.getParent() instanceof JViewport))
 			return;
 		JViewport viewport = (JViewport) table.getParent();
-		Rectangle rect = table.getCellRect(rowIndex, 0, true);
-		Point pt = viewport.getViewPosition();
-		rect.setLocation(rect.x - pt.x, rect.y - pt.y);
-		viewport.scrollRectToVisible(rect);
+	    // bottom of selection is 5 rows above bottom of scrollpane
+		//Rectangle rect = table.getCellRect(rowIndex, 0, true);
+		Rectangle r = table.getCellRect(rowIndex, 0, true);
+		int extentHeight = viewport.getExtentSize().height;
+		int viewHeight = viewport.getViewSize().height;
+
+		int y = Math.max(0, r.y - ((extentHeight - r.height) / 2));
+		y = Math.min(y, viewHeight - extentHeight);
+
+		viewport.setViewPosition(new Point(0, y));
+		//Point pt = viewport.getViewPosition();
+		//rect.setLocation(rect.x - pt.x, rect.y - pt.y);
+		//viewport.scrollRectToVisible(rect);
 		table.setRowSelectionInterval(rowIndex, rowIndex + sizeOfBlock - 1);
 	}
 

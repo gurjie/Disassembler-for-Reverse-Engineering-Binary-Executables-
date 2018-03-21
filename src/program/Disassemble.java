@@ -34,12 +34,39 @@ public class Disassemble {
 	private ArrayList<Long> symbolAddresses = new ArrayList<Long>(); // Holds addresses of symbols read
 	private ArrayList<SymbolEntry> symbolEntries = new ArrayList<SymbolEntry>(); // Symbol table entries
 	private HashSet<Integer> midBlockTargets = new HashSet<Integer>();
-
 	private Capstone cs;
-
 	private Set<String> conditionalCtis = new HashSet<String>();
 	private TreeMap<Integer, BasicBlock> blockList;
+	private int mainLoc;
 
+	public String getHexRepresentation(int startAddr, int endAddr, boolean spaces) {
+		byte[] slice = Arrays.copyOfRange(data, startAddr, endAddr+1);
+		String hexString = "";
+		if (spaces==true) {
+			hexString = array2hex(slice, true);
+
+		} else {
+			hexString = array2hex(slice, false);
+
+		}
+		return hexString;
+	}
+    
+    private static String array2hex(byte[] arr, boolean spaces) {
+        String ret = "";
+        for (int i=0;i<arr.length; i++) {
+        	if(spaces==true) {
+        		ret += String.format("%02x ", arr[i]);
+        	} else {
+        		ret += String.format("%02x", arr[i]);
+        	}
+        	if(i%40==0&&i!=0) {
+        		ret = ret.concat("\n");
+        	}
+        }
+        return ret;
+    }
+	
 	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
 		try {
 			this.data = Files.readAllBytes(f.toPath());
@@ -52,7 +79,7 @@ public class Disassemble {
 			throw new ElfException(e.getMessage() + "\nPerhaps select an ELF 64 bit file");
 		}
 		// System.out.println(elf.header);
-
+		
 		this.entry = (int) elf.header.entryPoint-0x400000;
 		this.textStart = (int) getTextSection(elf).fileOffset;
 		this.textSize = (int) getTextSection(elf).size;
@@ -63,6 +90,7 @@ public class Disassemble {
 		resolveSymbols(); // this only executes if function exists
 		buildConditionalCtis();
 		int main = setMain();
+		mainLoc = main;
 		this.blockList = new TreeMap<Integer, BasicBlock>();
 		this.possibleTargets.add(main);
 		if (this.symtabExists) {
@@ -222,6 +250,10 @@ public class Disassemble {
 
 	}
 
+	public int getMain() {
+		return this.mainLoc;
+	}
+	
 	public HashSet<Integer> getKnownAddresses() {
 		return this.knownAddresses;
 	}
@@ -410,7 +442,6 @@ public class Disassemble {
 				this.symbolAddresses.add(current.getAddress()); // Addresses of any symbols added
 			}
 			for (SymbolEntry sym : this.symbolEntries) {
-				System.out.println(sym.getName()+" "+sym.getType());
 				addFunctionFromSymtab(sym);
 			}
 		}

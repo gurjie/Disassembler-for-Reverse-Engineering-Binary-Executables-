@@ -7,6 +7,7 @@ import java.awt.Rectangle;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -65,6 +66,7 @@ public class View {
 	private JMenuItem copyAll;
 	private JMenuItem copyInstructions;
 	private InstructionTableModel InstructionTableModel;
+	
 
 	public View(String title) {
 		frame = new JFrame(title);
