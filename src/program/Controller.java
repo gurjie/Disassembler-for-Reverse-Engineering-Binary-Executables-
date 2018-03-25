@@ -8,10 +8,12 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -28,6 +30,8 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableModel;
+
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.model.mxCell;
@@ -46,9 +50,8 @@ public class Controller {
 	private boolean loaded;
 	private Function selectedFunction;
 	public final int COPY_FROM_ADDR = 1;
-    public final int COPY_FROM_MNEUMONIC = 2;
-    public final int COPY_FROM_FUNCT_NAME = 3;
-
+	public final int COPY_FROM_MNEUMONIC = 2;
+	public final int COPY_FROM_FUNCT_NAME = 3;
 
 	public Controller(Model m, View v) {
 		model = m;
@@ -63,10 +66,14 @@ public class Controller {
 		view.getMenuFile().add(view.getFileMenuExit());
 		view.getMenuBar().add(view.getMenuEdit());
 		view.getMenuBar().add(view.getMenuHelp());
+		view.getMenuEdit().add(view.getEditMenuSelectAll());
+		view.getMenuEdit().add(view.getEditMenuCopy());
+		view.getMenuEdit().add(view.getEditMenuCopyAll());
+		view.getMenuEdit().add(view.getEditMenuCopyInstructions());
+		view.getMenuEdit().add(view.getEditMenuExport());
 		view.getFrame().getContentPane().add(view.getToolBar(), BorderLayout.NORTH);
 		view.getToolBar().add(view.getLoadButton());
 		view.getToolBar().add(view.getExportButton());
-		view.getToolBar().add(view.getCfgButton());
 		view.getToolBar().add(view.getZoomInButton());
 		view.getToolBar().add(view.getZoomOutButton());
 		view.getFrame().getContentPane().add(view.getEncompassingPane(), BorderLayout.CENTER);
@@ -93,6 +100,18 @@ public class Controller {
 		view.getMainPane().setDividerLocation(450);
 	}
 
+	public String chooseDirectory() {
+		JFileChooser chooser = new JFileChooser();
+		chooser.setCurrentDirectory(new java.io.File("."));
+		chooser.setDialogTitle("Select Directory");
+		chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		chooser.setAcceptAllFileFilterUsed(false);
+		if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+			return chooser.getSelectedFile().getPath();
+		}
+		return "";
+	}
+	
 	public void initController() {
 		view.getFileMenuLoad().addActionListener(e -> {
 			loadFile();
@@ -103,26 +122,29 @@ public class Controller {
 		view.getLoadButton().addActionListener(e -> {
 			loadFile();
 		});
-		view.getExportButton().addActionListener(e -> export());
+		
+		view.getExportButton().addActionListener(e -> {
+				export();
+			
+		});
 
 		view.getExportSelected().addActionListener(e -> {
 			// do copy logic
 			exportSelected();
 			System.out.println("exporting selected...");
 		});
-		
-		
+
 		view.getCopy().addActionListener(e -> {
 			// do copy logic
 			selectedInstructionsToClipboard(this.COPY_FROM_ADDR);
 		});
-		
+
 		view.getCopyAll().addActionListener(e -> {
 			// do copy logic
 			selectedInstructionsToClipboard(this.COPY_FROM_FUNCT_NAME);
 
 		});
-		
+
 		view.getCopyInstructions().addActionListener(e -> {
 			// do copy logic
 			selectedInstructionsToClipboard(this.COPY_FROM_MNEUMONIC);
@@ -135,89 +157,125 @@ public class Controller {
 				showPopup(e);
 			}
 		});
+
+		view.getEditMenuCopy().addActionListener(e -> {
+			if (view.getInstTable().getSelectedRow() != -1) {
+				selectedInstructionsToClipboard(this.COPY_FROM_ADDR);
+			} else {
+				JOptionPane.showMessageDialog(new JFrame(), "Nothing selected to copy", "Nothing to copy",
+						JOptionPane.INFORMATION_MESSAGE);
+			}
+		});
+
+		view.getEditMenuCopyAll().addActionListener(e -> {
+			if (view.getInstTable().getSelectedRow() != -1) {
+				selectedInstructionsToClipboard(this.COPY_FROM_FUNCT_NAME);
+			} else {
+				JOptionPane.showMessageDialog(new JFrame(), "Nothing selected to copy", "Nothing to copy",
+						JOptionPane.INFORMATION_MESSAGE);
+			}
+		});
+
+		view.getEditMenuCopyInstructions().addActionListener(e -> {
+			if (view.getInstTable().getSelectedRow() != -1) {
+				selectedInstructionsToClipboard(this.COPY_FROM_MNEUMONIC);
+			} else {
+				JOptionPane.showMessageDialog(new JFrame(), "Nothing selected to copy", "Nothing to copy",
+						JOptionPane.INFORMATION_MESSAGE);
+			}
+		});
+
+		view.getEditMenuExport().addActionListener(e -> {
+			if (view.getInstTable().getSelectedRow() != -1) {
+				exportSelected();
+			} else {
+				JOptionPane.showMessageDialog(new JFrame(), "Nothing selected to export", "Nothing to export",
+						JOptionPane.INFORMATION_MESSAGE);
+			}
+		});
+
+		view.getEditMenuSelectAll().addActionListener(e -> {
+			if (view.getInstTable().getSelectedRow() != -1) {
+				view.getInstTable().selectAll();
+			}
+		});
 	}
-	
-	public void exportSelected () {
+
+	public void exportSelected() {
 		ExportView exportView = new ExportView();
-		ExportDialogue instance = new ExportDialogue(this.view.getFrame(),exportView,
-				"Export",view.getInstTable(),this.model);
+		ExportDialogue instance = new ExportDialogue(this.view.getFrame(), exportView, "Export", view.getInstTable(),
+				this.model);
 		instance.pack();
 		instance.setVisible(true);
 		/*
-		 JFileChooser chooser = new JFileChooser();
-		    chooser.setCurrentDirectory(new java.io.File("."));
-		    chooser.setDialogTitle("choosertitle");
-		    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-		    chooser.setAcceptAllFileFilterUsed(false);
-
-		    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-		      System.out.println("getCurrentDirectory(): " + chooser.getCurrentDirectory());
-		    } else {
-		      System.out.println("No Selection ");
-		    }
-		    */
+		 * JFileChooser chooser = new JFileChooser(); chooser.setCurrentDirectory(new
+		 * java.io.File(".")); chooser.setDialogTitle("choosertitle");
+		 * chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		 * chooser.setAcceptAllFileFilterUsed(false);
+		 * 
+		 * if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+		 * System.out.println("getCurrentDirectory(): " +
+		 * chooser.getCurrentDirectory()); } else { System.out.println("No Selection ");
+		 * }
+		 */
 	}
-	
-	public void selectedInstructionsToClipboard(int id ) {
-		StringSelection selection = new StringSelection(buildSelectionString(view.getInstTable().getSelectedRows(), 
-				id));
+
+	public void selectedInstructionsToClipboard(int id) {
+		StringSelection selection = new StringSelection(
+				buildSelectionString(view.getInstTable().getSelectedRows(), id));
 		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 		clipboard.setContents(selection, selection);
 	}
-	
+
 	public String buildSelectionString(int[] selectedRows, int id) {
 		String allSelected = "", row = "";
-		for(int x :selectedRows) {
+		for (int x : selectedRows) {
 			switch (id) {
-				case COPY_FROM_ADDR:
-					row = String.format("%s\t%s\t%s\n", 
-							view.getInstTable().getValueAt(x, 1), 
-							view.getInstTable().getValueAt(x, 2), 
-							view.getInstTable().getValueAt(x, 3));	
-					break;
-				case COPY_FROM_MNEUMONIC:
-					row = String.format("%s\t%s\n", view.getInstTable().getValueAt(x, 2)
-							, view.getInstTable().getValueAt(x, 3));	
-					break;
-				case COPY_FROM_FUNCT_NAME:
-					if(!view.getInstTable().getValueAt(x,0).equals("-")) {
-						allSelected = allSelected.concat("\n"+"----------"+
-					view.getInstTable().getValueAt(x,0)+"----------\n");
-					}
-					row = String.format("%s\t%s\t%s\n", 
-							view.getInstTable().getValueAt(x, 1), 
-							view.getInstTable().getValueAt(x, 2), 
-							view.getInstTable().getValueAt(x, 3));
-					break;
-				default:
-			}	
-			allSelected=allSelected.concat(row);
+			case COPY_FROM_ADDR:
+				row = String.format("%s\t%s\t%s\n", view.getInstTable().getValueAt(x, 1),
+						view.getInstTable().getValueAt(x, 2), view.getInstTable().getValueAt(x, 3));
+				break;
+			case COPY_FROM_MNEUMONIC:
+				row = String.format("%s\t%s\n", view.getInstTable().getValueAt(x, 2),
+						view.getInstTable().getValueAt(x, 3));
+				break;
+			case COPY_FROM_FUNCT_NAME:
+				if (!view.getInstTable().getValueAt(x, 0).equals("-")) {
+					allSelected = allSelected
+							.concat("\n" + "----------" + view.getInstTable().getValueAt(x, 0) + "----------\n");
+				}
+				row = String.format("%s\t%s\t%s\n", view.getInstTable().getValueAt(x, 1),
+						view.getInstTable().getValueAt(x, 2), view.getInstTable().getValueAt(x, 3));
+				break;
+			default:
+			}
+			allSelected = allSelected.concat(row);
 		}
 		return allSelected;
-		
+
 	}
-	
+
 	public void selectedInstructionsWithFunctNameToClipboard() {
 		String allSelected = "";
 		int[] selectedRows = view.getInstTable().getSelectedRows();
 		String row = "";
-		for(int x :selectedRows) {
-			row = String.format("%s\t%s\t%s\n", view.getInstTable().getValueAt(x, 1), view.getInstTable().getValueAt(x, 2)
-					, view.getInstTable().getValueAt(x, 3));	
-			allSelected=allSelected.concat(row);
+		for (int x : selectedRows) {
+			row = String.format("%s\t%s\t%s\n", view.getInstTable().getValueAt(x, 1),
+					view.getInstTable().getValueAt(x, 2), view.getInstTable().getValueAt(x, 3));
+			allSelected = allSelected.concat(row);
 		}
 		StringSelection selection = new StringSelection(allSelected);
 		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 		clipboard.setContents(selection, selection);
 	}
-	
+
 	public void showPopup(MouseEvent e) {
 		if (SwingUtilities.isRightMouseButton(e) == true) {
 			view.getPopup().show(e.getComponent(), e.getX(), e.getY());
 		}
-		
+
 	}
-	
+
 	public void initInstTableModel() {
 		view.getModel().setModel(getInstructionList(), this.model.getFunctions(), this.model.getBasicBlocks());
 		view.getInstTable().setModel(view.getModel());
@@ -248,7 +306,6 @@ public class Controller {
 					int index = list.locationToIndex(evt.getPoint());
 					selectedFunction = view.getFunctionList().getSelectedValue();
 					if (selectedFunction.getStartAddr() == 0) {
-						System.out.println("x");
 						JOptionPane.showMessageDialog(new JFrame(),
 								selectedFunction.getName() + " is a shared library! Can't display disassembly.",
 								"Shared library", JOptionPane.INFORMATION_MESSAGE);
@@ -271,6 +328,18 @@ public class Controller {
 	}
 
 	private void loadFile() {
+		if (view.getInstTable().getRowCount() != 0) {
+			int a = JOptionPane.showConfirmDialog(view.getFrame(),
+					"You are about to load a new file. Doing so will "
+							+ "close the current disassembly instance. Are you sure?",
+					"Load new fil", JOptionPane.YES_NO_OPTION);
+			if (a == JOptionPane.YES_OPTION) {
+				System.out.println("continue");
+			} else {
+				return;
+			}
+		}
+		view.getInstTable().setModel(new DefaultTableModel());
 		view.getGraphTabbedPane().removeAll();
 		view.getFunctionModel().removeAllElements();
 		view.getSectionModel().removeAllElements();
@@ -288,8 +357,8 @@ public class Controller {
 				if (!this.model.symTabExists()) {
 					JOptionPane.showMessageDialog(new JFrame(), "The symbol table could not be "
 							+ "resolved. As a result, only functions reachable from main \nhave been disassembled. "
-							+ "Functions discovered are basic blocks with no parents.",
-							"Warning", JOptionPane.WARNING_MESSAGE);
+							+ "Functions discovered are basic blocks with no parents.", "Warning",
+							JOptionPane.WARNING_MESSAGE);
 				}
 				for (Function func : this.model.getFunctions()) {
 					view.getFunctionModel().addElement(func);
@@ -316,8 +385,9 @@ public class Controller {
 
 					});
 				}
-				for(Function f : this.model.getFunctions()) {
-					if(f.getStartAddr()-0x400000==this.model.getMain()) {
+				for (Function f : this.model.getFunctions()) {
+					if (f.getStartAddr() - this.model.getVtf() == this.model.getMain()) {
+						this.selectedFunction = f;
 						showCFG(f);
 					}
 				}
@@ -338,45 +408,28 @@ public class Controller {
 
 	private void export() {
 		if (this.loaded == true) {
+			File exportDir = new File(chooseDirectory());
+			String exportName = model.getFile().getName() + ".png";
+			String exportFileName = model.getFile().getName();
+			int exportNumber = 0;
+			String exportSuffix = ".png";
+			while (new File(exportDir.getPath(), exportName).exists()) {
+				exportNumber++;
+				exportName = exportFileName.concat(Integer.toString(exportNumber)).concat(exportSuffix);
+			}
+			System.out.println(exportName);
+			File newFile = new File(exportDir.getPath(), exportName);
 			try {
-				String name = selectedFunction.getName();
-				String home = System.getProperty("user.home");
-				String exportDirName = this.model.getFile().getName() + "_exports";
-				File exportDir = new File(home, exportDirName);
-				// if the directory does not exist, create it
-				if (!exportDir.exists()) {
-					System.out.println("creating directory: " + exportDir.getName());
-					boolean result = false;
-					try {
-						exportDir.mkdir();
-						result = true;
-					} catch (SecurityException e) {
-						JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Security Exception",
-								JOptionPane.ERROR_MESSAGE);
-					}
-					if (result) {
-						System.out.println("DIR created");
-					}
-				}
-				String exportName = name + ".png";
-				int exportNumber = 0;
-				String exportFileName = name;
-				String exportSuffix = ".png";
-				while (new File(home + "/" + exportDirName, exportName).exists()) {
-					exportNumber++;
-					exportName = exportFileName.concat(Integer.toString(exportNumber)).concat(exportSuffix);
-				}
-				System.out.println(exportName);
-
-				File newFile = new File(home + "/" + exportDirName, exportName);
+				FileWriter fw = new FileWriter(newFile);
+				fw.write(exportDir.getPath());
+				fw.close();
 				BufferedImage image = mxCellRenderer.createBufferedImage(this.graph, null, 1, Color.WHITE, true, null);
 				ImageIO.write(image, "PNG", newFile);
-				JOptionPane.showMessageDialog(new JFrame(), "Exported CFG to " + newFile.getPath(), "Export Successful",
+				JOptionPane.showMessageDialog(new JFrame(), newFile.getName()+" exported to "+newFile.getPath(),
+						"Success",
 						JOptionPane.INFORMATION_MESSAGE);
-			} catch (IOException e) {
-				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Export error", JOptionPane.ERROR_MESSAGE);
-			} catch (NullPointerException e) {
-				JOptionPane.showMessageDialog(new JFrame(), "No CFG to export", "Graph error",
+			} catch (IOException iox) {
+				JOptionPane.showMessageDialog(new JFrame(), iox.getMessage(), "File Write Exception",
 						JOptionPane.ERROR_MESSAGE);
 			}
 		}
@@ -522,8 +575,8 @@ public class Controller {
 		if (!(table.getParent() instanceof JViewport))
 			return;
 		JViewport viewport = (JViewport) table.getParent();
-	    // bottom of selection is 5 rows above bottom of scrollpane
-		//Rectangle rect = table.getCellRect(rowIndex, 0, true);
+		// bottom of selection is 5 rows above bottom of scrollpane
+		// Rectangle rect = table.getCellRect(rowIndex, 0, true);
 		Rectangle r = table.getCellRect(rowIndex, 0, true);
 		int extentHeight = viewport.getExtentSize().height;
 		int viewHeight = viewport.getViewSize().height;
@@ -532,9 +585,9 @@ public class Controller {
 		y = Math.min(y, viewHeight - extentHeight);
 
 		viewport.setViewPosition(new Point(0, y));
-		//Point pt = viewport.getViewPosition();
-		//rect.setLocation(rect.x - pt.x, rect.y - pt.y);
-		//viewport.scrollRectToVisible(rect);
+		// Point pt = viewport.getViewPosition();
+		// rect.setLocation(rect.x - pt.x, rect.y - pt.y);
+		// viewport.scrollRectToVisible(rect);
 		table.setRowSelectionInterval(rowIndex, rowIndex + sizeOfBlock - 1);
 	}
 

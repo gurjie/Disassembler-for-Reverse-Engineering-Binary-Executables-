@@ -33,6 +33,11 @@ public class View {
 	private JMenu menuFile;
 	private JMenuItem fileMenuLoad;
 	private JMenuItem fileMenuExit;
+	private JMenuItem editMenuCopy;
+	private JMenuItem editMenuCopyAll;
+	private JMenuItem editMenuCopyInstructions;
+	private JMenuItem editMenuExport;
+	private JMenuItem editMenuSelectAll;
 	private JMenu menuEdit;
 	private JMenu menuHelp;
 	private JToolBar toolBar;
@@ -78,6 +83,12 @@ public class View {
 		menuFile = new JMenu("File");
 		fileMenuLoad = new JMenuItem("Load Executable");
 		fileMenuExit = new JMenuItem("Exit");
+		editMenuCopy = new JMenuItem("Copy (addr, mneumonic, opstring)");
+		editMenuCopyAll = new JMenuItem("Copy (function, addr, mneumonic, opstring)");
+		editMenuCopyInstructions= new JMenuItem("Copy (mneumonic, opstring)");
+
+		editMenuExport = new JMenuItem("Export selected...");
+		  editMenuSelectAll = new JMenuItem("Select All");
 		menuEdit = new JMenu("Edit");
 		menuHelp = new JMenu("Help");
 		toolBar = new JToolBar();
@@ -127,6 +138,15 @@ public class View {
 
 	public JMenuItem getCopyAll() {
 		return copyAll;
+	}
+	
+	public JMenuItem getEditMenuCopyAll() {
+		return editMenuCopyAll;
+	}
+
+
+	public JMenuItem getEditMenuCopyInstructions() {
+		return editMenuCopyInstructions;
 	}
 	
 	public JMenuItem getCopyInstructions() {
@@ -248,6 +268,20 @@ public class View {
 
 	public JPanel getInstPanel() {
 		return instPanel;
+	}
+	
+	public JMenuItem getEditMenuCopy() {
+		return editMenuCopy;
+	}
+
+
+	public JMenuItem getEditMenuExport() {
+		return editMenuExport;
+	}
+
+
+	public JMenuItem getEditMenuSelectAll() {
+		return editMenuSelectAll;
 	}
 
 	/*

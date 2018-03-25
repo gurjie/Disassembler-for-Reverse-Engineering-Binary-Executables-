@@ -10,11 +10,19 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.junit.platform.commons.util.StringUtils;
+
 import capstone.Capstone;
 import elf.Elf;
+import elf.ProgramHeader;
 import elf.SectionHeader;
+import elf.SegmentType;
 
 public class Disassemble {
 	private Elf elf;
@@ -38,6 +46,8 @@ public class Disassemble {
 	private Set<String> conditionalCtis = new HashSet<String>();
 	private TreeMap<Integer, BasicBlock> blockList;
 	private int mainLoc;
+	private int vtfAdjustment;
+	private int rip;
 
 	public String getHexRepresentation(int startAddr, int endAddr, boolean spaces) {
 		byte[] slice = Arrays.copyOfRange(data, startAddr, endAddr+1);
@@ -60,11 +70,15 @@ public class Disassemble {
         	} else {
         		ret += String.format("%02x", arr[i]);
         	}
-        	if(i%40==0&&i!=0) {
+        	if(i%29==0&&i!=0) {
         		ret = ret.concat("\n");
         	}
         }
         return ret;
+    }
+    
+    public int getVtf() {
+    	return this.vtfAdjustment;
     }
 	
 	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
@@ -80,12 +94,12 @@ public class Disassemble {
 		}
 		// System.out.println(elf.header);
 		
-		this.entry = (int) elf.header.entryPoint-0x400000;
+		this.vtfAdjustment = (int) elf.getProgramHeaderByType(SegmentType.LOAD).physicalAddress;
+		this.entry = (int) elf.header.entryPoint-vtfAdjustment;
 		this.textStart = (int) getTextSection(elf).fileOffset;
 		this.textSize = (int) getTextSection(elf).size;
 		this.text_bytes = Arrays.copyOfRange(data, textStart, (int) (textStart + textSize));
 		this.cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
-
 		setSections();
 		resolveSymbols(); // this only executes if function exists
 		buildConditionalCtis();
@@ -96,7 +110,7 @@ public class Disassemble {
 		if (this.symtabExists) {
 			for (Function ff : this.functions) {
 				if (ff.getStartAddr() != 0) {
-					this.possibleTargets.add(ff.getStartAddr() - 0x400000);
+					this.possibleTargets.add(ff.getStartAddr() - vtfAdjustment);
 				}
 			}
 			disasm(main);
@@ -122,7 +136,7 @@ public class Disassemble {
 					for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
 						if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
 							Function ff;
-							if((current.getFirstAddress()-0x400000)==main) {
+							if((current.getFirstAddress()-vtfAdjustment)==main) {
 								ff = new Function("main");
 							} else {
 								ff = new Function(Integer.toHexString(current.getFirstAddress()));
@@ -278,7 +292,7 @@ public class Disassemble {
 		if (this.symtabExists && this.strtabExists) {
 			for (Function funct : functions) {
 				if (funct.getName().equals("main")) {
-					return (int) funct.getStartAddr() - 0x400000;
+					return (int) funct.getStartAddr() - vtfAdjustment;
 				}
 			}
 		} else {
@@ -355,7 +369,7 @@ public class Disassemble {
 				System.out.println(x);
 			}*/
 			/*
-			if (address == 4205752 - 0x400000) {
+			if (address == 4205752 - vtfAdjustment) {
 				System.out.println(current.getFirstAddress());
 				System.out.println("first instruction of cb8 is "+instruction.mnemonic);
 				System.out.println(current.getBlockSize());
@@ -366,23 +380,23 @@ public class Disassemble {
 			}
 
 			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
-				int jumpAddr = getTargetAddress(instruction) - 0x400000;
+				int jumpAddr = getTargetAddress(instruction) - vtfAdjustment;
 				if (jumpAddr != -1) {
 					if (jumpAddr >= textStart && jumpAddr <= textStart + textSize) {
 						if (!this.knownAddresses.contains(jumpAddr)) {
 							this.possibleTargets.add(jumpAddr);
 							if(!instruction.mnemonic.equals("call")) {
-								current.addAddressReference(jumpAddr + 0x400000);
+								current.addAddressReference(jumpAddr + vtfAdjustment);
 							} 
 						} else if (this.knownAddresses.contains(jumpAddr)
-								&& !this.blockList.containsKey(jumpAddr + 0x400000)) {
+								&& !this.blockList.containsKey(jumpAddr + vtfAdjustment)) {
 							this.midBlockTargets.add(jumpAddr);
 							if(!instruction.mnemonic.equals("call")) {
-								current.addAddressReference(jumpAddr + 0x400000);
+								current.addAddressReference(jumpAddr + vtfAdjustment);
 							}
 						} else {
 							if(!instruction.mnemonic.equals("call")) {
-								current.addAddressReference(jumpAddr + 0x400000);
+								current.addAddressReference(jumpAddr + vtfAdjustment);
 							}						}
 					} else {
 						current.addAddressReferenceOutOfScope(jumpAddr);
@@ -391,7 +405,7 @@ public class Disassemble {
 				int continueAddr = address + instruction.size;
 				if (!instruction.mnemonic.equals("jmp")) {
 					this.possibleTargets.add(continueAddr);
-					current.addAddressReference(continueAddr + 0x400000);
+					current.addAddressReference(continueAddr + vtfAdjustment);
 				}
 				return current;
 			} else {
@@ -442,6 +456,7 @@ public class Disassemble {
 				this.symbolAddresses.add(current.getAddress()); // Addresses of any symbols added
 			}
 			for (SymbolEntry sym : this.symbolEntries) {
+				System.out.println(sym.getName()+"  "+sym.getAddress()+"  "+sym.getType());
 				addFunctionFromSymtab(sym);
 			}
 		}
@@ -611,7 +626,7 @@ public class Disassemble {
 	 */
 	private Capstone.CsInsn disasmInstructionAtAddress(int address, byte[] data, int entry, long textSize) {
 		byte[] instruction_bytes = Arrays.copyOfRange(data, (int) address, (int) address + 15);
-		Capstone.CsInsn[] allInsn = this.cs.disasm(instruction_bytes, 0x400000 + address, 1);
+		Capstone.CsInsn[] allInsn = this.cs.disasm(instruction_bytes, vtfAdjustment + address, 1);
 		if (allInsn.length > 0) {
 			this.knownAddresses.add(address);
 			return allInsn[0];
@@ -669,12 +684,18 @@ public class Disassemble {
 	 */
 	private int discoverMain(int entry, int textSize, byte[] data) throws MainDiscoveryException {
 		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>(); // list of instructions
+		System.out.println("data is "+data.length+" big.");
+		System.out.println("entry at "+entry);
+		System.out.println("text section from "+textStart+" to "+(textStart+textSize));
 		byte[] first_bytes = Arrays.copyOfRange(data, entry, entry + 15);
 		Capstone.CsInsn[] first = cs.disasm(first_bytes, entry, 1); // first instruction disassembled
 		Capstone.CsInsn instruction = first[0];
 		startInstructions.add(instruction);
 		int instSize = instruction.size;
 		while (!instruction.mnemonic.equals("hlt")) {
+			System.out.println(Long.toHexString(instruction.address)+"\t"+instruction.mnemonic+"\t"+instruction.opStr);
+			this.rip = (int) (instruction.address+instruction.size);
+			//System.out.println(Integer.toHexString(rip));
 			// disassemble until hlt reached
 			first_bytes = Arrays.copyOfRange(data, entry+instSize, (int) (entry + 15+instSize));
 			Capstone.CsInsn[] allInsn = cs.disasm(first_bytes, entry + instSize, 1);
@@ -687,16 +708,53 @@ public class Disassemble {
 			index--;
 		}
 		if (startInstructions.get(index).mnemonic.equals("call")) {
-			if (startInstructions.get(index - 1).mnemonic.equals("mov")) {
+			if (startInstructions.get(index - 1).mnemonic.equals("mov")||
+					startInstructions.get(index - 1).mnemonic.equals("lea")) {
 				String[] operands = startInstructions.get(index - 1).opStr.split(",");
 				for (String s : operands) {
 					if (resolveAddressFromString(s) != -1) {
-						return (int) resolveAddressFromString(s) - 0x400000;
-					} 
-				}
+						return (int) resolveAddressFromString(s) - vtfAdjustment;
+					} else {
+						// couldnt resolve a clean address, so get the value in the register
+						if (s.matches(".di")) {
+							continue;
+						} else {
+							if (s.contains("ip")) {
+								String out = s;
+								if (s.contains("[")) {
+									out = s.substring(s.indexOf("[") + 1, s.indexOf("]"));
+								}
+								StringBuffer buf = new StringBuffer(out);
+								int start = firstIndex(buf.toString(), ".ip");
+								int end = start + 3;
+								buf.replace(start, end, Integer.toString(this.rip));
+								String halfway = buf.toString();
+								int hexStrlen = 0;
+						        if(halfway.contains("0x")) {
+						        	String[] tmp = halfway.split("\\s+");
+						        	for(String st : tmp) {
+						        		if(st.contains("0x")) {
+						        			hexStrlen = st.length();
+						        		}
+						        	}
+						        }
+						        String ii = halfway.substring(halfway.indexOf("0x"), halfway.indexOf("0x")+hexStrlen);
+						        long x = Long.decode(ii);
+						        int d = (int) x;
+						        StringBuffer buf2 = new StringBuffer(halfway);
+						        buf2.replace(halfway.indexOf("0x"), halfway.indexOf("0x")+hexStrlen, Integer.toString(d));
+						        return evaluteQuestion(buf2.toString());
+						        
+							}
+							// if(out.contains(s))
+						}
+						
+					}
+				} 
+				
 				throw new MainDiscoveryException("Couldn't find main: expected address in register before call to libc_start_main");
 			} else if (startInstructions.get(index - 1).mnemonic.equals("push")) {
-				return (int) resolveAddressFromString(startInstructions.get(index - 1).opStr) - 0x400000;
+				return (int) resolveAddressFromString(startInstructions.get(index - 1).opStr) - vtfAdjustment;
 			} else {
 				throw new MainDiscoveryException("Couldn't find main: expected moving of main address into register before libc_start_main called,"
 						+ "wasn't found at instruction proceeding call.");
@@ -732,6 +790,44 @@ public class Disassemble {
 			}
 		}
 		return elf.sectionHeaders[1];
+	}
+
+	
+	//find first index of some regex pattern in a string
+	public int firstIndex(String text, String regex) {
+	    Pattern pattern = Pattern.compile(regex);
+	    Matcher matcher = pattern.matcher(text);
+	    // Check all occurrences
+	    while (matcher.find()) {
+	    	return matcher.start();
+	    }
+	    return 0;
+	}
+	
+	public static int evaluteQuestion(String question){
+	    Scanner sc = new Scanner(question);
+
+	    // get the next number from the scanner
+	    int firstValue = Integer.parseInt(sc.findInLine("[0-9]*"));
+
+	    // get everything which follows and is not a number (might contain white spaces)
+	    String operator = sc.findInLine("[^0-9]*").trim();
+	    int secondValue = Integer.parseInt(sc.findInLine("[0-9]*"));
+	    switch (operator){
+	        case "+":
+	            return firstValue + secondValue;
+	        case "-":
+	            return firstValue - secondValue;
+	        case "/":
+	            return firstValue / secondValue;
+	        case "*":
+	            return firstValue * secondValue;
+	        case "%":
+	            return firstValue % secondValue;
+	        // todo: add additional operators as needed..
+	        default:
+	            throw new RuntimeException("unknown operator: "+operator);
+	    }
 	}
 
 }

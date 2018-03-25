@@ -54,11 +54,15 @@ public class Model {
 	}
 	
 	public String getHexRepresentationSpaces(int first, int last, boolean spaces) {
-		return this.instance.getHexRepresentation(first-0x400000, last-0x400000, spaces);
+		return this.instance.getHexRepresentation(first-this.instance.getVtf(), last-this.instance.getVtf(), spaces);
 	}
 	
 	public int getMain() {
 		return this.instance.getMain();
+	}
+	
+	public int getVtf() {
+		return this.instance.getVtf();
 	}
 
 	/*

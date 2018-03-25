@@ -16,17 +16,18 @@ public class InstructionTableModel extends AbstractTableModel {
 	private ArrayList<Capstone.CsInsn> instructions;
 	private List<Function> functions;
 	private Map<Integer, BasicBlock> blocks;
-	
+
 	public InstructionTableModel() {
-	
+
 	}
-	
-	public void setModel(ArrayList<Capstone.CsInsn> instructions, List<Function> list, Map<Integer, BasicBlock> blocks) {
-		this.instructions = instructions; 
-		this.functions = list; 
+
+	public void setModel(ArrayList<Capstone.CsInsn> instructions, List<Function> list,
+			Map<Integer, BasicBlock> blocks) {
+		this.instructions = instructions;
+		this.functions = list;
 		this.blocks = blocks;
 	}
-	
+
 	@Override
 	public int getRowCount() {
 		// TODO Auto-generated method stub
@@ -42,16 +43,16 @@ public class InstructionTableModel extends AbstractTableModel {
 	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
 		Capstone.CsInsn instruction = this.instructions.get(rowIndex);
-		switch(columnIndex) {
+		switch (columnIndex) {
 		case 0:
-			for(Function ff:this.functions) {
-				if(ff.getStartAddr()==instruction.address) {
+			for (Function ff : this.functions) {
+				if (ff.getStartAddr() == instruction.address) {
 					return ff.getName();
 				}
-			}			
+			}
 			return "-";
-		case 1: 
-			return "0x"+Integer.toHexString((int) instruction.address);
+		case 1:
+			return "0x" + Integer.toHexString((int) instruction.address);
 		case 2:
 			return instruction.mnemonic;
 		case 3:
@@ -60,7 +61,7 @@ public class InstructionTableModel extends AbstractTableModel {
 			return "";
 		}
 	}
-	
+
 	public String getColumnName(int column) {
 		return this.columnNames[column];
 	}
