@@ -8,7 +8,7 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.awt.event.ActionEvent;
+
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import javax.imageio.ImageIO;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JList;
@@ -31,6 +32,7 @@ import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
@@ -48,6 +50,7 @@ public class Controller {
 	private View view;
 	private mxGraph graph;
 	private boolean loaded;
+	private boolean initialised = false;
 	private Function selectedFunction;
 	public final int COPY_FROM_ADDR = 1;
 	public final int COPY_FROM_MNEUMONIC = 2;
@@ -59,6 +62,8 @@ public class Controller {
 		initView();
 	}
 
+	
+	
 	public void initView() {
 		view.getFrame().setJMenuBar(view.getMenuBar());
 		view.getMenuBar().add(view.getMenuFile());
@@ -98,6 +103,18 @@ public class Controller {
 		view.getPopup().add(view.getCopyAll());
 		view.getMainPane().setLeftComponent(view.getGraphTabbedPane());
 		view.getMainPane().setDividerLocation(450);
+		view.getToolBar().add(view.getJbtFilter());
+
+		//btnSearch = new JButton("Search");
+
+		
+
+
+
+
+
+
+		
 	}
 
 	public String chooseDirectory() {
@@ -109,10 +126,13 @@ public class Controller {
 		if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
 			return chooser.getSelectedFile().getPath();
 		}
-		return "";
+		return "none selected";
 	}
 	
+	
 	public void initController() {
+		
+		
 		view.getFileMenuLoad().addActionListener(e -> {
 			loadFile();
 		});
@@ -131,7 +151,6 @@ public class Controller {
 		view.getExportSelected().addActionListener(e -> {
 			// do copy logic
 			exportSelected();
-			System.out.println("exporting selected...");
 		});
 
 		view.getCopy().addActionListener(e -> {
@@ -276,9 +295,16 @@ public class Controller {
 
 	}
 
+	
 	public void initInstTableModel() {
 		view.getModel().setModel(getInstructionList(), this.model.getFunctions(), this.model.getBasicBlocks());
 		view.getInstTable().setModel(view.getModel());
+		// Code adapted from Paul Samsotha answer to 
+		//https://stackoverflow.com/questions/22066387/how-to-search-an-element-in-a-jtable-java 
+		TableRowSorter<InstructionTableModel> rowSorter = new TableRowSorter<>(view.getModel());
+		view.getInstTable().setRowSorter(rowSorter);
+		view.getJbtFilter().setVisible(false);
+		TableSortFilter f = new TableSortFilter(view.getInstTable(), rowSorter, view.getJtfFilter(), view.getToolBar());
 
 	}
 
@@ -333,11 +359,9 @@ public class Controller {
 					"You are about to load a new file. Doing so will "
 							+ "close the current disassembly instance. Are you sure?",
 					"Load new fil", JOptionPane.YES_NO_OPTION);
-			if (a == JOptionPane.YES_OPTION) {
-				System.out.println("continue");
-			} else {
+			if (a != JOptionPane.YES_OPTION) {
 				return;
-			}
+			} 
 		}
 		view.getInstTable().setModel(new DefaultTableModel());
 		view.getGraphTabbedPane().removeAll();
@@ -352,7 +376,7 @@ public class Controller {
 				this.model.disassemble();
 				loaded = true;
 				for (Section s : this.model.getSections()) {
-					view.getSectionModel().addElement(s.getName());
+					view.getSectionModel().addElement(s.getName()+"   0x"+Long.toHexString(s.getAddress()));
 				}
 				if (!this.model.symTabExists()) {
 					JOptionPane.showMessageDialog(new JFrame(), "The symbol table could not be "
@@ -391,8 +415,15 @@ public class Controller {
 						showCFG(f);
 					}
 				}
-				initInstTableModel();
-				initFunctionsListener();
+					initInstTableModel();
+					if(this.initialised==false) {
+						initFunctionsListener();
+					}
+					JOptionPane.showMessageDialog(new JFrame(),
+							"Disassembled "+
+					this.model.getFile().getName()+" in "+this.model.getElapsed()+"ms" ,
+							"Disasm time", JOptionPane.INFORMATION_MESSAGE);
+				
 
 			} catch (ReadException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Exception", JOptionPane.ERROR_MESSAGE);
@@ -408,7 +439,12 @@ public class Controller {
 
 	private void export() {
 		if (this.loaded == true) {
-			File exportDir = new File(chooseDirectory());
+			String chosenDir = chooseDirectory();
+			if(chosenDir.equals("none selected")) {
+				return;
+			}
+			File exportDir = new File(chosenDir);
+		
 			String exportName = model.getFile().getName() + ".png";
 			String exportFileName = model.getFile().getName();
 			int exportNumber = 0;

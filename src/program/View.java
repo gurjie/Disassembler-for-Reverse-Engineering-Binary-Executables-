@@ -20,6 +20,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.JToolBar;
 
 import com.mxgraph.swing.mxGraphComponent;
@@ -71,6 +72,17 @@ public class View {
 	private JMenuItem copyAll;
 	private JMenuItem copyInstructions;
 	private InstructionTableModel InstructionTableModel;
+	public JTextField getJtfFilter() {
+		return jtfFilter;
+	}
+
+
+	public JButton getJbtFilter() {
+		return jbtFilter;
+	}
+
+	private JTextField jtfFilter;
+	private JButton jbtFilter;
 	
 
 	public View(String title) {
@@ -121,6 +133,8 @@ public class View {
 		copyAll = new JMenuItem("Copy (function, addr, mneumonic, opstring)");
 		copyInstructions = new JMenuItem("Copy (mneumonic, opstring)");
 		InstructionTableModel = new InstructionTableModel();
+		 jtfFilter = new JTextField();
+		 jbtFilter = new JButton("Filter");
 	}
 
 	

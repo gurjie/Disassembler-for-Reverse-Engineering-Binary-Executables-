@@ -3,10 +3,8 @@ package program;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableModel;
 
 import capstone.Capstone;
 
@@ -56,6 +54,14 @@ public class InstructionTableModel extends AbstractTableModel {
 		case 2:
 			return instruction.mnemonic;
 		case 3:
+			int target = getTargetAddress(instruction);
+			if(target!=-1) {
+				for(Function ff:this.functions) {
+					if(ff.getStartAddr()==target) {
+						return "__"+ff.getName()+"__";
+					}
+				}
+			}
 			return instruction.opStr;
 		default:
 			return "";
@@ -64,6 +70,14 @@ public class InstructionTableModel extends AbstractTableModel {
 
 	public String getColumnName(int column) {
 		return this.columnNames[column];
+	}
+	private int getTargetAddress(Capstone.CsInsn instruction) {
+		try {
+			long address = Long.decode(instruction.opStr.trim());
+			return (int) address;
+		} catch (NumberFormatException e) {
+			return -1;
+		}
 	}
 
 }

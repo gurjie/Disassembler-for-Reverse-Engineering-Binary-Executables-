@@ -18,6 +18,7 @@ public class BasicBlock {
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
 	private int startAddress;
 	private int endAddress;
+	private boolean isFunction;
 
 	public BasicBlock() {
 		instructionList = new ArrayList<Capstone.CsInsn>();
@@ -154,6 +155,20 @@ public class BasicBlock {
 	
 	public boolean isEmpty() {
 		return this.instructionList.isEmpty();
+	}
+	
+	
+	
+	public int getParentCount() {
+		return this.parents.size();
+	}
+	 
+	public void setAsFunction() {
+		this.isFunction = true;
+	}
+	
+	public boolean isFunction() {
+		return this.isFunction;
 	}
 	
 	

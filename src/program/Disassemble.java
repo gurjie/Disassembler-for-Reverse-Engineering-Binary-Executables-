@@ -15,13 +15,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.junit.platform.commons.util.StringUtils;
-
 import capstone.Capstone;
 import elf.Elf;
-import elf.ProgramHeader;
 import elf.SectionHeader;
+import elf.SectionType;
 import elf.SegmentType;
 
 public class Disassemble {
@@ -41,47 +38,20 @@ public class Disassemble {
 	private ArrayList<Function> functions = new ArrayList<Function>();
 	private ArrayList<Long> symbolAddresses = new ArrayList<Long>(); // Holds addresses of symbols read
 	private ArrayList<SymbolEntry> symbolEntries = new ArrayList<SymbolEntry>(); // Symbol table entries
-	private HashSet<Integer> midBlockTargets = new HashSet<Integer>();
 	private Capstone cs;
 	private Set<String> conditionalCtis = new HashSet<String>();
 	private TreeMap<Integer, BasicBlock> blockList;
 	private int mainLoc;
 	private int vtfAdjustment;
 	private int rip;
-
-	public String getHexRepresentation(int startAddr, int endAddr, boolean spaces) {
-		byte[] slice = Arrays.copyOfRange(data, startAddr, endAddr+1);
-		String hexString = "";
-		if (spaces==true) {
-			hexString = array2hex(slice, true);
-
-		} else {
-			hexString = array2hex(slice, false);
-
-		}
-		return hexString;
+	private long elapsed;
+	
+	public long getElapsed() {
+		return this.elapsed;
 	}
-    
-    private static String array2hex(byte[] arr, boolean spaces) {
-        String ret = "";
-        for (int i=0;i<arr.length; i++) {
-        	if(spaces==true) {
-        		ret += String.format("%02x ", arr[i]);
-        	} else {
-        		ret += String.format("%02x", arr[i]);
-        	}
-        	if(i%29==0&&i!=0) {
-        		ret = ret.concat("\n");
-        	}
-        }
-        return ret;
-    }
-    
-    public int getVtf() {
-    	return this.vtfAdjustment;
-    }
 	
 	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
+		long time = System.currentTimeMillis();
 		try {
 			this.data = Files.readAllBytes(f.toPath());
 		} catch (IOException e) {
@@ -114,19 +84,44 @@ public class Disassemble {
 				}
 			}
 			disasm(main);
+			
 		} else {
 			disasm(main);
-			Iterator<BasicBlock> blockItr = this.blockList.values().iterator();
 			
+			
+			Iterator<BasicBlock> blockItr = this.blockList.values().iterator();
 			// give blocks parents
 			while (blockItr.hasNext()) {
 				BasicBlock current = blockItr.next();
-				for(int children : current.getAddressReferenceList()) {
-					if(this.blockList.containsKey(children)) {
-						this.blockList.get(children).addParent(current.getFirstAddress());
-					} 
+
+					for(int children : current.getAddressReferenceList()) {
+						if(this.blockList.containsKey(children)) {
+							this.blockList.get(children).addParent(current.getFirstAddress());
+						} 
+					}
+			}	
+			
+			Iterator<BasicBlock> callToZero = this.blockList.values().iterator();
+			while (callToZero.hasNext()) {
+				BasicBlock current = callToZero.next();
+				if(current.getLastInstruction().mnemonic.equals("call")) {
+					//System.out.printf("0x%x:\t%s\t%s\n", current.getLastInstruction().address,
+							//current.getLastInstruction().mnemonic, current.getLastInstruction().opStr);
+					int callAddr = getTargetAddress(current.getLastInstruction());
+					if(callAddr!=-1) {
+						//System.out.print(current.instructionsToString());
+						//System.out.println(Long.toHexString(callAddr));
+						if(callAddr-this.vtfAdjustment >= textStart && callAddr-this.vtfAdjustment <= textStart + textSize) {
+							if(this.blockList.containsKey(callAddr)) {
+								this.blockList.get(callAddr).getParents().clear();
+							}
+						}
+					}
 				}
-			}
+				
+			}	
+			
+
 			
 			// set blocks with 0 parents as a function
 			Iterator<BasicBlock> testItr = this.blockList.values().iterator();
@@ -140,58 +135,22 @@ public class Disassemble {
 								ff = new Function("main");
 							} else {
 								ff = new Function(Integer.toHexString(current.getFirstAddress()));
-
 							}
 							ff.setStartAddr(current.getFirstAddress());
 							ff.setEndAddr(entry.getValue().getLastInstruction().address);
 							this.functions.add(ff);
-							ff.setAssociatedAddresses(this.blockList);
+							//ff.setAssociatedAddresses(this.blockList);
 							break;
-						}
+						}	
+
 					}
-					//System.out.println(Integer.toHexString(current.getFirstAddress())+ " has no parents. Function?" );
 				}
-				//System.out.println(current.instructionsToString());
 			}
 			
-			//System.out.println("there are "+knownCallTargets.size()+" unique call targets. sounds fishy?");
-			// find functions
-			/*
-			Iterator<BasicBlock> itr4 = this.blockList.values().iterator();
-			while (itr4.hasNext()) {
-				BasicBlock current = itr4.next();
-				if (current.getInstructionList().get(0).mnemonic.equals("push")
-						&& current.getInstructionList().get(1).mnemonic.equals("mov")) {
-					if (current.getInstructionList().get(0).opStr.matches(".bp")) {
-						if (current.getInstructionList().get(1).opStr.matches(".bp, .sp")) {
-							Function function = new Function("0x" + Integer.toHexString((current.getFirstAddress())));
-							function.setStartAddr(current.getFirstAddress());
-							for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
-								if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
-									function.setEndAddr(entry.getValue().getLastInstruction().address);
-									break;
-								}
-							}
-							boolean contains = false;
-							for(Function ff:this.functions) {
-								if(ff.getStartAddr()==current.getFirstAddress()) {
-									contains = true;
-								}
-							}
-							if(contains==false) {
-								this.functions.add(function);
-								System.out.println("added");
-							}
-						}
-					}
-				}
-
-			}*/
 		}
 
 		Iterator<BasicBlock> splitBlock2 = this.blockList.values().iterator();
 		Map<Integer, BasicBlock> splitBlockList = new TreeMap<Integer, BasicBlock>();
-
 		while (splitBlock2.hasNext()) {
 			BasicBlock current = splitBlock2.next();
 			if(current.getBlockSize()!=0) {
@@ -232,7 +191,6 @@ public class Disassemble {
 		while (splitBlockIt.hasNext()) {
 			BasicBlock current = splitBlockIt.next();
 			this.blockList.put(current.getFirstAddress(), current);
-			//System.out.println("/x//////"+current.instructionsToString());
 		}
 
 		Iterator<BasicBlock> itr = this.blockList.values().iterator();
@@ -254,14 +212,18 @@ public class Disassemble {
 				}
 			}
 		}
+		
 
-		/*
-		Iterator<BasicBlock> itr3 = this.blockList.values().iterator();
-		while (itr3.hasNext()) {
-			BasicBlock current = itr3.next();
-			System.out.println(current.instructionsToString());
-		}*/
+		Iterator<BasicBlock> itit = this.blockList.values().iterator();
+		while (itit.hasNext()) {
+			BasicBlock current = itit.next();
+			//System.out.println(current.instructionsToString());
+		}
 
+		long endtime = System.currentTimeMillis();
+		long total = endtime-time;
+		this.elapsed = total;
+		System.out.println(total);
 	}
 
 	public int getMain() {
@@ -318,13 +280,11 @@ public class Disassemble {
 	private void disasm(int address) {
 		for (int i = 0; i < this.possibleTargets.size(); i++) {
 			BasicBlock current = buildBlock(this.possibleTargets.get(i));
-			if(current.getInstructionList().size()!=0&&current.getFirstAddress()==4205752) {
-				System.out.println("adaggdagadgdgad");
-			}
 			if (current.getBlockSize() != 0) {
 				this.blockList.put(current.getFirstAddress(), current);
 			}
 		}
+
 	}
 
 	/**
@@ -388,16 +348,16 @@ public class Disassemble {
 							if(!instruction.mnemonic.equals("call")) {
 								current.addAddressReference(jumpAddr + vtfAdjustment);
 							} 
-						} else if (this.knownAddresses.contains(jumpAddr)
+						} else if (this.knownAddresses.contains(jumpAddr) //IGNORE
 								&& !this.blockList.containsKey(jumpAddr + vtfAdjustment)) {
-							this.midBlockTargets.add(jumpAddr);
 							if(!instruction.mnemonic.equals("call")) {
 								current.addAddressReference(jumpAddr + vtfAdjustment);
 							}
 						} else {
 							if(!instruction.mnemonic.equals("call")) {
 								current.addAddressReference(jumpAddr + vtfAdjustment);
-							}						}
+							}						
+						}
 					} else {
 						current.addAddressReferenceOutOfScope(jumpAddr);
 					}
@@ -431,7 +391,7 @@ public class Disassemble {
 		for (SectionHeader shrs : this.elf.sectionHeaders) {
 			checkForSymtab(shrs);
 			checkForStrTab(shrs);
-			Section current = new Section(shrs.getName());
+			Section current = new Section(shrs.getName(),(int) shrs.virtualAddress);
 			this.sections.add(current);
 		}
 	}
@@ -684,16 +644,14 @@ public class Disassemble {
 	 */
 	private int discoverMain(int entry, int textSize, byte[] data) throws MainDiscoveryException {
 		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>(); // list of instructions
-		System.out.println("data is "+data.length+" big.");
-		System.out.println("entry at "+entry);
-		System.out.println("text section from "+textStart+" to "+(textStart+textSize));
+		
 		byte[] first_bytes = Arrays.copyOfRange(data, entry, entry + 15);
 		Capstone.CsInsn[] first = cs.disasm(first_bytes, entry, 1); // first instruction disassembled
 		Capstone.CsInsn instruction = first[0];
 		startInstructions.add(instruction);
 		int instSize = instruction.size;
 		while (!instruction.mnemonic.equals("hlt")) {
-			System.out.println(Long.toHexString(instruction.address)+"\t"+instruction.mnemonic+"\t"+instruction.opStr);
+			//System.out.println(Long.toHexString(instruction.address)+"\t"+instruction.mnemonic+"\t"+instruction.opStr);
 			this.rip = (int) (instruction.address+instruction.size);
 			//System.out.println(Integer.toHexString(rip));
 			// disassemble until hlt reached
@@ -716,7 +674,7 @@ public class Disassemble {
 						return (int) resolveAddressFromString(s) - vtfAdjustment;
 					} else {
 						// couldnt resolve a clean address, so get the value in the register
-						if (s.matches(".di")) {
+						if (s.matches(".di||.bp||.sp||.ep")) {
 							continue;
 						} else {
 							if (s.contains("ip")) {
@@ -829,5 +787,35 @@ public class Disassemble {
 	            throw new RuntimeException("unknown operator: "+operator);
 	    }
 	}
+	
+	public String getHexRepresentation(int startAddr, int endAddr, boolean spaces) {
+		byte[] slice = Arrays.copyOfRange(data, startAddr, endAddr+1);
+		String hexString = "";
+		if (spaces==true) {
+			hexString = array2hex(slice, true);
+		} else {
+			hexString = array2hex(slice, false);
+		}
+		return hexString;
+	}
+    
+    private static String array2hex(byte[] arr, boolean spaces) {
+        String ret = "";
+        for (int i=0;i<arr.length; i++) {
+        	if(spaces==true) {
+        		ret += String.format("%02x ", arr[i]);
+        	} else {
+        		ret += String.format("%02x", arr[i]);
+        	}
+        	if(i%29==0&&i!=0) {
+        		ret = ret.concat("\n");
+        	}
+        }
+        return ret;
+    }
+    
+    public int getVtf() {
+    	return this.vtfAdjustment;
+    }
 
 }

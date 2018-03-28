@@ -65,6 +65,10 @@ public class Model {
 		return this.instance.getVtf();
 	}
 
+	public long getElapsed() {
+		return this.instance.getElapsed();
+	}
+	
 	/*
 	public void disassembleFunction(Function f) {
 		if(this.instance.getKnownAddresses().contains(address)) {
