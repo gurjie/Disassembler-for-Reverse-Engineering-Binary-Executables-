@@ -87,70 +87,58 @@ public class Disassemble {
 			
 		} else {
 			disasm(main);
-			
-			
-			Iterator<BasicBlock> blockItr = this.blockList.values().iterator();
-			// give blocks parents
-			while (blockItr.hasNext()) {
-				BasicBlock current = blockItr.next();
+			assignParents();
+			resetCallTargetParents();
+			markFunctions(main);	
+		}
 
-					for(int children : current.getAddressReferenceList()) {
-						if(this.blockList.containsKey(children)) {
-							this.blockList.get(children).addParent(current.getFirstAddress());
-						} 
-					}
-			}	
-			
-			Iterator<BasicBlock> callToZero = this.blockList.values().iterator();
-			while (callToZero.hasNext()) {
-				BasicBlock current = callToZero.next();
-				if(current.getLastInstruction().mnemonic.equals("call")) {
-					//System.out.printf("0x%x:\t%s\t%s\n", current.getLastInstruction().address,
-							//current.getLastInstruction().mnemonic, current.getLastInstruction().opStr);
-					int callAddr = getTargetAddress(current.getLastInstruction());
-					if(callAddr!=-1) {
-						//System.out.print(current.instructionsToString());
-						//System.out.println(Long.toHexString(callAddr));
-						if(callAddr-this.vtfAdjustment >= textStart && callAddr-this.vtfAdjustment <= textStart + textSize) {
-							if(this.blockList.containsKey(callAddr)) {
-								this.blockList.get(callAddr).getParents().clear();
-							}
+		Map<Integer, BasicBlock> splitBlockList = new TreeMap<Integer, BasicBlock>();
+		splitBlocks(splitBlockList);
+		updateSplitBlocks(splitBlockList);
+		addLoopReferences();
+		
+		/*
+		Iterator<BasicBlock> itit = this.blockList.values().iterator();
+		while (itit.hasNext()) {
+			BasicBlock current = itit.next();
+			//System.out.println(current.instructionsToString());
+		}*/
+
+		long endtime = System.currentTimeMillis();
+		long total = endtime-time;
+		this.elapsed = total;
+		System.out.println(total);
+	}
+
+	public void addLoopReferences() {
+		Iterator<BasicBlock> itr = this.blockList.values().iterator();
+		while (itr.hasNext()) {
+			BasicBlock current = itr.next();
+			if (!isConditionalCti(current.getLastInstruction()) && !isUnconditionalCti(current.getLastInstruction())) {
+				if (!isReturnInstruction(current.getLastInstruction())) {
+					Iterator<BasicBlock> itr2 = this.blockList.values().iterator();
+					while (itr2.hasNext()) { // Iterate over the blocks to find its origin...
+						BasicBlock potential = itr2.next();
+						if (potential.getFirstInstruction().address == current.getLastAddress()
+								+ current.getLastInstruction().size) {
+							current.addLoopAddressReference(((int) potential.getFirstInstruction().address));
 						}
 					}
 				}
-				
-			}	
-			
-
-			
-			// set blocks with 0 parents as a function
-			Iterator<BasicBlock> testItr = this.blockList.values().iterator();
-			while (testItr.hasNext()) {
-				BasicBlock current = testItr.next();
-				if(current.getParents().size()==0) {
-					for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
-						if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
-							Function ff;
-							if((current.getFirstAddress()-vtfAdjustment)==main) {
-								ff = new Function("main");
-							} else {
-								ff = new Function(Integer.toHexString(current.getFirstAddress()));
-							}
-							ff.setStartAddr(current.getFirstAddress());
-							ff.setEndAddr(entry.getValue().getLastInstruction().address);
-							this.functions.add(ff);
-							//ff.setAssociatedAddresses(this.blockList);
-							break;
-						}	
-
-					}
-				}
 			}
-			
 		}
-
+	}
+	
+	public void updateSplitBlocks(Map<Integer,BasicBlock> splitBlockList) {
+		Iterator<BasicBlock> splitBlockIt = splitBlockList.values().iterator();
+		while (splitBlockIt.hasNext()) {
+			BasicBlock current = splitBlockIt.next();
+			this.blockList.put(current.getFirstAddress(), current);
+		}
+	}
+	
+	public void splitBlocks(Map<Integer,BasicBlock> splitBlockList) {
 		Iterator<BasicBlock> splitBlock2 = this.blockList.values().iterator();
-		Map<Integer, BasicBlock> splitBlockList = new TreeMap<Integer, BasicBlock>();
 		while (splitBlock2.hasNext()) {
 			BasicBlock current = splitBlock2.next();
 			if(current.getBlockSize()!=0) {
@@ -159,73 +147,100 @@ public class Disassemble {
 				if(target!=-1) {
 					if(!this.blockList.containsKey(target)) {
 						Iterator<BasicBlock> targetIt = this.blockList.values().iterator();
-						while (targetIt.hasNext()) {
-							BasicBlock tmp = targetIt.next();
-							if(tmp.getBlockSize()!=0) {
-							if(tmp.containsAddress(target)) {
-								HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
-								HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
-								initialLoopReferences.addAll(tmp.getLoopAddressReferences());
-								initialAddrReferences.addAll(tmp.getAddressReferenceList());
-								ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(
-										tmp.getInstructionList().subList(0, tmp.indexOfAddress(target)));
-								ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(tmp.getInstructionList()
-										.subList(tmp.indexOfAddress(target), tmp.getInstructionList().size()));
-								this.blockList.get(tmp.getFirstAddress()).overwriteInstructions(initialInsns,
-										(int) targetList.get(0).address);
-								BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after split
-								jumpBlock.setInstructionList(targetList);
-								jumpBlock.setReferences(initialAddrReferences);
-								jumpBlock.setLoopReferences(initialLoopReferences);
-								splitBlockList.put(jumpBlock.getFirstAddress(), jumpBlock);
+							while (targetIt.hasNext()) {
+								BasicBlock tmp = targetIt.next();
+								if (tmp.getBlockSize() != 0) {
+									if (tmp.containsAddress(target)) {
+										HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
+										HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
+										initialLoopReferences.addAll(tmp.getLoopAddressReferences());
+										initialAddrReferences.addAll(tmp.getAddressReferenceList());
+										ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(
+												tmp.getInstructionList().subList(0, tmp.indexOfAddress(target)));
+										ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(
+												tmp.getInstructionList().subList(tmp.indexOfAddress(target),
+														tmp.getInstructionList().size()));
+										this.blockList.get(tmp.getFirstAddress()).overwriteInstructions(initialInsns,
+												(int) targetList.get(0).address);
+										BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after
+																					// split
+										jumpBlock.setInstructionList(targetList);
+										jumpBlock.setReferences(initialAddrReferences);
+										jumpBlock.setLoopReferences(initialLoopReferences);
+										splitBlockList.put(jumpBlock.getFirstAddress(), jumpBlock);
+									}
+								}
 							}
-						}}
-						
-					}
-				}
-			}
-			}
-		}
 
-		Iterator<BasicBlock> splitBlockIt = splitBlockList.values().iterator();
-		while (splitBlockIt.hasNext()) {
-			BasicBlock current = splitBlockIt.next();
-			this.blockList.put(current.getFirstAddress(), current);
-		}
-
-		Iterator<BasicBlock> itr = this.blockList.values().iterator();
-		while (itr.hasNext()) {
-			BasicBlock current = itr.next();
-			// if its normal transfer instruction....
-			if (!isConditionalCti(current.getLastInstruction()) && !isUnconditionalCti(current.getLastInstruction())) {
-				if (!isReturnInstruction(current.getLastInstruction())) {
-					Iterator<BasicBlock> itr2 = this.blockList.values().iterator();
-					while (itr2.hasNext()) { // Iterate over the blocks to find its origin...
-						BasicBlock potential = itr2.next();
-						if (potential.getFirstInstruction().address == current.getLastAddress()
-								+ current.getLastInstruction().size) {
-							// System.out.println("making link from "+current.getLastInstruction().address+"
-							// to "+potential.getFirstInstruction().address);
-							current.addLoopAddressReference(((int) potential.getFirstInstruction().address));
 						}
 					}
 				}
 			}
 		}
-		
-
-		Iterator<BasicBlock> itit = this.blockList.values().iterator();
-		while (itit.hasNext()) {
-			BasicBlock current = itit.next();
-			//System.out.println(current.instructionsToString());
-		}
-
-		long endtime = System.currentTimeMillis();
-		long total = endtime-time;
-		this.elapsed = total;
-		System.out.println(total);
 	}
+	
+	
+	public void assignParents() {
+		Iterator<BasicBlock> blockItr = this.blockList.values().iterator();
+		// give blocks parents
+		while (blockItr.hasNext()) {
+			BasicBlock current = blockItr.next();
+				for(int children : current.getAddressReferenceList()) {
+					if(this.blockList.containsKey(children)) {
+						this.blockList.get(children).addParent(current.getFirstAddress());
+					} 
+				}
+		}	
+	}
+	
+	public void resetCallTargetParents() {
+		Iterator<BasicBlock> callToZero = this.blockList.values().iterator();
+		while (callToZero.hasNext()) {
+			BasicBlock current = callToZero.next();
+			if(current.getLastInstruction().mnemonic.equals("call")) {
+				//System.out.printf("0x%x:\t%s\t%s\n", current.getLastInstruction().address,
+						//current.getLastInstruction().mnemonic, current.getLastInstruction().opStr);
+				int callAddr = getTargetAddress(current.getLastInstruction());
+				if(callAddr!=-1) {
+					//System.out.print(current.instructionsToString());
+					//System.out.println(Long.toHexString(callAddr));
+					if(callAddr-this.vtfAdjustment >= textStart && callAddr-this.vtfAdjustment <= textStart + textSize) {
+						if(this.blockList.containsKey(callAddr)) {
+							this.blockList.get(callAddr).getParents().clear();
+						}
+					}
+				}
+			}
+			
+		}
+	}
+	
+	public void markFunctions(int main) {
+		Iterator<BasicBlock> testItr = this.blockList.values().iterator();
+		while (testItr.hasNext()) {
+			BasicBlock current = testItr.next();
+			if(current.getParents().size()==0) {
+				for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
+					if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
+						Function ff;
+						if((current.getFirstAddress()-vtfAdjustment)==main) {
+							ff = new Function("main");
+						} else {
+							ff = new Function(Integer.toHexString(current.getFirstAddress()));
+						}
+						ff.setStartAddr(current.getFirstAddress());
+						ff.setEndAddr(entry.getValue().getLastInstruction().address);
+						this.functions.add(ff);
+						//ff.setAssociatedAddresses(this.blockList);
+						break;
+					}	
 
+				}
+			}
+		}
+	}
+	
+	
 	public int getMain() {
 		return this.mainLoc;
 	}

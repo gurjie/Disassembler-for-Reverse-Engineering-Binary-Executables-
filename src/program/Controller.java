@@ -62,8 +62,10 @@ public class Controller {
 		initView();
 	}
 
-	
-	
+	/**
+	 * Builds the UI components by letting components know eachotehr that they exist
+	 * Layouts set and general parameters set
+	 */
 	public void initView() {
 		view.getFrame().setJMenuBar(view.getMenuBar());
 		view.getMenuBar().add(view.getMenuFile());
@@ -105,18 +107,14 @@ public class Controller {
 		view.getMainPane().setDividerLocation(450);
 		view.getToolBar().add(view.getJbtFilter());
 
-		//btnSearch = new JButton("Search");
-
-		
-
-
-
-
-
-
-		
 	}
 
+	/**
+	 * Opens a JFileChooser when called, letting the user choose a file from their
+	 * file system
+	 * 
+	 * @return string path to the directory. "none selected" if no selection
+	 */
 	public String chooseDirectory() {
 		JFileChooser chooser = new JFileChooser();
 		chooser.setCurrentDirectory(new java.io.File("."));
@@ -128,55 +126,53 @@ public class Controller {
 		}
 		return "none selected";
 	}
-	
-	
+
+	/**
+	 * Initialise the listeners, listening for changes in the view
+	 */
 	public void initController() {
-		
-		
+		// listener for load button in the file option in the main menu
 		view.getFileMenuLoad().addActionListener(e -> {
 			loadFile();
 		});
+		// listener for exit button in the file option in the main menu
 		view.getFileMenuExit().addActionListener(e -> {
 			System.exit(0);
 		});
+		// listener for load button in the toolbar
 		view.getLoadButton().addActionListener(e -> {
 			loadFile();
 		});
-		
+		// listener for the export button
 		view.getExportButton().addActionListener(e -> {
-				export();
-			
+			export();
 		});
-
+		// listener for export jmenuitem in the edit option of the main menu
 		view.getExportSelected().addActionListener(e -> {
-			// do copy logic
 			exportSelected();
 		});
-
+		// right click popumenu item copy listener, copies formatted showing from addr onwards
 		view.getCopy().addActionListener(e -> {
-			// do copy logic
 			selectedInstructionsToClipboard(this.COPY_FROM_ADDR);
 		});
-
+		// right click popumenu item copy listener, copies formatted showing from funct name onwards
 		view.getCopyAll().addActionListener(e -> {
-			// do copy logic
 			selectedInstructionsToClipboard(this.COPY_FROM_FUNCT_NAME);
 
 		});
-
+		// right click popumenu item copy listener, copies formatted showing from menominic onwards
 		view.getCopyInstructions().addActionListener(e -> {
-			// do copy logic
 			selectedInstructionsToClipboard(this.COPY_FROM_MNEUMONIC);
-
 		});
-
+		// mouse listener for the instruciton table right click
 		view.getInstTable().addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseReleased(MouseEvent e) {
 				showPopup(e);
 			}
 		});
-
+		// listener for copy jmenuitem in the edit option of the main menu
+		// this copy button copies from the funt address onwards
 		view.getEditMenuCopy().addActionListener(e -> {
 			if (view.getInstTable().getSelectedRow() != -1) {
 				selectedInstructionsToClipboard(this.COPY_FROM_ADDR);
@@ -185,7 +181,8 @@ public class Controller {
 						JOptionPane.INFORMATION_MESSAGE);
 			}
 		});
-
+		// listener for copy jmenuitem in the edit option of the main menu
+		// this copy button copies from the function name onwards
 		view.getEditMenuCopyAll().addActionListener(e -> {
 			if (view.getInstTable().getSelectedRow() != -1) {
 				selectedInstructionsToClipboard(this.COPY_FROM_FUNCT_NAME);
@@ -194,7 +191,8 @@ public class Controller {
 						JOptionPane.INFORMATION_MESSAGE);
 			}
 		});
-
+		// listener for copy jmenuitem in the edit option of the main menu
+		// this copy button copies from the menmonic onwards
 		view.getEditMenuCopyInstructions().addActionListener(e -> {
 			if (view.getInstTable().getSelectedRow() != -1) {
 				selectedInstructionsToClipboard(this.COPY_FROM_MNEUMONIC);
@@ -203,7 +201,7 @@ public class Controller {
 						JOptionPane.INFORMATION_MESSAGE);
 			}
 		});
-
+		// Listener for the export button location in the edit menu
 		view.getEditMenuExport().addActionListener(e -> {
 			if (view.getInstTable().getSelectedRow() != -1) {
 				exportSelected();
@@ -212,7 +210,7 @@ public class Controller {
 						JOptionPane.INFORMATION_MESSAGE);
 			}
 		});
-
+		// listener for select all menu item in the edit menu
 		view.getEditMenuSelectAll().addActionListener(e -> {
 			if (view.getInstTable().getSelectedRow() != -1) {
 				view.getInstTable().selectAll();
@@ -220,32 +218,39 @@ public class Controller {
 		});
 	}
 
+	/**
+	 * Instantiate the dialogue box which appears whenever export is selected
+	 * such that it is invoked with the model view controller patter
+	 */
 	public void exportSelected() {
 		ExportView exportView = new ExportView();
 		ExportDialogue instance = new ExportDialogue(this.view.getFrame(), exportView, "Export", view.getInstTable(),
 				this.model);
 		instance.pack();
 		instance.setVisible(true);
-		/*
-		 * JFileChooser chooser = new JFileChooser(); chooser.setCurrentDirectory(new
-		 * java.io.File(".")); chooser.setDialogTitle("choosertitle");
-		 * chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-		 * chooser.setAcceptAllFileFilterUsed(false);
-		 * 
-		 * if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-		 * System.out.println("getCurrentDirectory(): " +
-		 * chooser.getCurrentDirectory()); } else { System.out.println("No Selection ");
-		 * }
-		 */
 	}
 
+	/**
+	 * Copies whatever is selected in the instruction table to clipboard
+	 * @param id represents the format in which to present instructions when copied to the clipboard, 
+	 * 			id can be COPY_FROM_ADDR, copies from the address column in the table onwards
+	 * 			id can be COPY_FROM MNEMONIC copies from menmonic column in table onwards
+	 * 			id can be COPY_FROM_FUNCT_NAME copies from name column in table onwards
+	 * 
+	 */
 	public void selectedInstructionsToClipboard(int id) {
 		StringSelection selection = new StringSelection(
 				buildSelectionString(view.getInstTable().getSelectedRows(), id));
 		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 		clipboard.setContents(selection, selection);
 	}
-
+	
+	/**
+	 * Builds a string representing the selected rows in the instruction table
+	 * @param selectedRows rows currently selected in the table
+	 * @param id id of the selection type
+	 * @return a string representing the isntructions selected int he table 
+	 */
 	public String buildSelectionString(int[] selectedRows, int id) {
 		String allSelected = "", row = "";
 		for (int x : selectedRows) {
@@ -274,20 +279,10 @@ public class Controller {
 
 	}
 
-	public void selectedInstructionsWithFunctNameToClipboard() {
-		String allSelected = "";
-		int[] selectedRows = view.getInstTable().getSelectedRows();
-		String row = "";
-		for (int x : selectedRows) {
-			row = String.format("%s\t%s\t%s\n", view.getInstTable().getValueAt(x, 1),
-					view.getInstTable().getValueAt(x, 2), view.getInstTable().getValueAt(x, 3));
-			allSelected = allSelected.concat(row);
-		}
-		StringSelection selection = new StringSelection(allSelected);
-		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-		clipboard.setContents(selection, selection);
-	}
-
+	/**
+	 * display the popup at (x,y) from view whenever right click selected 
+	 * @param e MouseEvent which could be a right click
+	 */
 	public void showPopup(MouseEvent e) {
 		if (SwingUtilities.isRightMouseButton(e) == true) {
 			view.getPopup().show(e.getComponent(), e.getX(), e.getY());
@@ -295,12 +290,15 @@ public class Controller {
 
 	}
 
-	
+	/** 
+	 * Initialises the instruction table, filling the table by setting the table model
+	 * Sets the row sorter so that table search can be implemented
+	 */
 	public void initInstTableModel() {
 		view.getModel().setModel(getInstructionList(), this.model.getFunctions(), this.model.getBasicBlocks());
 		view.getInstTable().setModel(view.getModel());
-		// Code adapted from Paul Samsotha answer to 
-		//https://stackoverflow.com/questions/22066387/how-to-search-an-element-in-a-jtable-java 
+		// Code adapted from Paul Samsotha answer to
+		// https://stackoverflow.com/questions/22066387/how-to-search-an-element-in-a-jtable-java
 		TableRowSorter<InstructionTableModel> rowSorter = new TableRowSorter<>(view.getModel());
 		view.getInstTable().setRowSorter(rowSorter);
 		view.getJbtFilter().setVisible(false);
@@ -308,11 +306,20 @@ public class Controller {
 
 	}
 
+	/**
+	 * Initialises the listeners for zoom buttons in the view, such that when presses, the control flow
+	 * graph zooms
+	 * @param graphComponent related to the control flow graph
+	 */
 	public void initZoomListeners(mxGraphComponent graphComponent) {
 		view.getZoomInButton().addActionListener(e -> zoomIn(graphComponent));
 		view.getZoomOutButton().addActionListener(e -> zoomOut(graphComponent));
 	}
 
+	/**
+	 * Build a list representing all instructions in the executable to be displayed in the instruction able
+	 * @return list of all instructions in the executable to be displayed in instruction table
+	 */
 	public ArrayList<Capstone.CsInsn> getInstructionList() {
 		ArrayList<Capstone.CsInsn> instructions = new ArrayList<Capstone.CsInsn>();
 		Iterator<BasicBlock> blockIterator = this.model.getBasicBlocks().values().iterator();
@@ -324,6 +331,10 @@ public class Controller {
 		return instructions;
 	}
 
+	/**
+	 * Initialise the lister for when a function is pressed
+	 * when a function is double clicked in the list, the function is shown in the CFG 
+	 */
 	public void initFunctionsListener() {
 		view.getFunctionList().addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent evt) {
@@ -349,10 +360,11 @@ public class Controller {
 		});
 	}
 
-	private void graphScroll() {
-		System.out.println("Scrolled");
-	}
 
+	/**
+	 * Load an executable to be disassembled. Initialises all UI components required to be updated after loading
+	 * the executable
+	 */
 	private void loadFile() {
 		if (view.getInstTable().getRowCount() != 0) {
 			int a = JOptionPane.showConfirmDialog(view.getFrame(),
@@ -361,7 +373,7 @@ public class Controller {
 					"Load new fil", JOptionPane.YES_NO_OPTION);
 			if (a != JOptionPane.YES_OPTION) {
 				return;
-			} 
+			}
 		}
 		view.getInstTable().setModel(new DefaultTableModel());
 		view.getGraphTabbedPane().removeAll();
@@ -376,7 +388,7 @@ public class Controller {
 				this.model.disassemble();
 				loaded = true;
 				for (Section s : this.model.getSections()) {
-					view.getSectionModel().addElement(s.getName()+"   0x"+Long.toHexString(s.getAddress()));
+					view.getSectionModel().addElement(s.getName() + "   0x" + Long.toHexString(s.getAddress()));
 				}
 				if (!this.model.symTabExists()) {
 					JOptionPane.showMessageDialog(new JFrame(), "The symbol table could not be "
@@ -415,15 +427,13 @@ public class Controller {
 						showCFG(f);
 					}
 				}
-					initInstTableModel();
-					if(this.initialised==false) {
-						initFunctionsListener();
-					}
-					JOptionPane.showMessageDialog(new JFrame(),
-							"Disassembled "+
-					this.model.getFile().getName()+" in "+this.model.getElapsed()+"ms" ,
-							"Disasm time", JOptionPane.INFORMATION_MESSAGE);
-				
+				initInstTableModel();
+				if (this.initialised == false) {
+					initFunctionsListener();
+				}
+				JOptionPane.showMessageDialog(new JFrame(),
+						"Disassembled " + this.model.getFile().getName() + " in " + this.model.getElapsed() + "ms",
+						"Disasm time", JOptionPane.INFORMATION_MESSAGE);
 
 			} catch (ReadException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Exception", JOptionPane.ERROR_MESSAGE);
@@ -437,14 +447,18 @@ public class Controller {
 		}
 	}
 
+	/**
+	 * Export the control flow graph, rendering the graph a PNG, such that it 
+	 * can be exported
+	 */
 	private void export() {
 		if (this.loaded == true) {
 			String chosenDir = chooseDirectory();
-			if(chosenDir.equals("none selected")) {
+			if (chosenDir.equals("none selected")) {
 				return;
 			}
 			File exportDir = new File(chosenDir);
-		
+
 			String exportName = model.getFile().getName() + ".png";
 			String exportFileName = model.getFile().getName();
 			int exportNumber = 0;
@@ -461,9 +475,8 @@ public class Controller {
 				fw.close();
 				BufferedImage image = mxCellRenderer.createBufferedImage(this.graph, null, 1, Color.WHITE, true, null);
 				ImageIO.write(image, "PNG", newFile);
-				JOptionPane.showMessageDialog(new JFrame(), newFile.getName()+" exported to "+newFile.getPath(),
-						"Success",
-						JOptionPane.INFORMATION_MESSAGE);
+				JOptionPane.showMessageDialog(new JFrame(), newFile.getName() + " exported to " + newFile.getPath(),
+						"Success", JOptionPane.INFORMATION_MESSAGE);
 			} catch (IOException iox) {
 				JOptionPane.showMessageDialog(new JFrame(), iox.getMessage(), "File Write Exception",
 						JOptionPane.ERROR_MESSAGE);
@@ -471,6 +484,12 @@ public class Controller {
 		}
 	}
 
+	/**
+	 * Find basic block nearest to a block. Pretty much deprecated but still used. 
+	 * @param map Basic blocks disassembled
+	 * @param value representing the block the find's beginning address
+	 * @return the nearest block in the basic block list to the address input
+	 */
 	private static BasicBlock findNearest(Map<Integer, BasicBlock> map, int value) {
 		Map.Entry<Integer, BasicBlock> previousEntry = null;
 		for (Entry<Integer, BasicBlock> e : map.entrySet()) {
@@ -490,22 +509,31 @@ public class Controller {
 		return previousEntry.getValue();
 	}
 
+	/**
+	 * Display the control flow graph
+	 * @param f function who's cfg to show
+	 */
 	private void showCFG(Function f) {
+		// make a new graph
 		this.graph = new mxGraph();
 		Object parent = graph.getDefaultParent();
 		graph.getModel().beginUpdate();
+		// end create graph
 		try {
+			// let functions know all addresses associated with them; sets this information, as it is only
+			// required for displaying the CFG, so it does this as and when required
 			f.setAssociatedAddresses(this.model.getBasicBlocks());
-			// store a mapping of basic blocks to vertices
+			
+			// Linked hashmap mapping basic blocks to mxgraph objects
 			Map<BasicBlock, Object> blockToVertex = new LinkedHashMap<BasicBlock, Object>();
-			BasicBlock first = findNearest(this.model.getBasicBlocks(), f.getStartAddr());
-			Object root = graph.insertVertex(graph.getDefaultParent(), Integer.toHexString((first.getFirstAddress())),
-					first.instructionsToString(), 240, 150, 80, 30);
-			blockToVertex.put(first, root);
-			graph.updateCellSize(root);
-			int id = 0;
+			BasicBlock first = findNearest(this.model.getBasicBlocks(), f.getStartAddr()); // set the first block
+			Object root = graph.insertVertex(graph.getDefaultParent(), Integer.toHexString((first.getFirstAddress())), 
+					first.instructionsToString(), 240, 150, 80, 30); // create a vertex representing the initial block
+			blockToVertex.put(first, root); // map the first block to the root node
+			graph.updateCellSize(root); // update size of the root node to its contained text
+			// for every address associated with an instruction
 			for (int addr : f.getAssociatedAddresses()) {
-
+				// create a node in the graph representing the basic block at this address and store it in the mapping
 				BasicBlock block = findNearest(this.model.getBasicBlocks(), addr);
 				Object vertex = graph.insertVertex(graph.getDefaultParent(),
 						Integer.toHexString((block.getFirstAddress())), block.instructionsToString(), 240, 150, 80, 30);
@@ -513,17 +541,19 @@ public class Controller {
 				graph.updateCellSize(vertex);
 			}
 
-			// for every basic block connect its reference addresses
+			// For every basic block associated with a function
 			for (int i : f.getAssociatedAddresses()) {
+				// connect the basic block to create a link from it to one of its children
 				BasicBlock block0 = findNearest(this.model.getBasicBlocks(), i);
 				Object vertex0 = blockToVertex.get(block0);
 				for (int x : block0.getAddressReferenceList()) {
 					BasicBlock block1 = findNearest(this.model.getBasicBlocks(), x);
-					;
 					Object vertex1 = blockToVertex.get(block1);
 					Object e1 = graph.insertEdge(graph.getDefaultParent(), null, "", vertex0, vertex1);
 				}
 
+				// blocks that reference themselves are have loop address references, and should be 
+				// represented on the control flow graph as such
 				for (int x : block0.getLoopAddressReferences()) {
 					BasicBlock block1 = findNearest(this.model.getBasicBlocks(), x);
 					Object vertex1 = blockToVertex.get(block1);
@@ -531,23 +561,23 @@ public class Controller {
 				}
 
 			}
-
+			
 			Object vertex0 = blockToVertex.get(first);
 			for (int x : first.getAddressReferenceList()) {
 				BasicBlock block1 = this.model.getBasicBlocks().get(x);
 				Object vertex1 = blockToVertex.get(block1);
-				// System.out.println("added");
 				Object e1 = graph.insertEdge(graph.getDefaultParent(), null, "", vertex0, vertex1);
 			}
 
 		} finally {
 			graph.getModel().endUpdate();
 		}
-		graph.setCellsResizable(true);
-		graph.setCellsDisconnectable(false);
-		graph.setEdgeLabelsMovable(false);
-		graph.alignCells(mxConstants.ALIGN_RIGHT);
-		mxGraphComponent graphComponent = new mxGraphComponent(graph);
+		graph.setCellsResizable(true); // cells can be resized
+		graph.setCellsDisconnectable(false); // arrows can't be disconnected from cells
+		graph.setEdgeLabelsMovable(false); // edge labels can't be moved
+		graph.alignCells(mxConstants.ALIGN_RIGHT); // Align the content of the cells
+		mxGraphComponent graphComponent = new mxGraphComponent(graph); 
+		// listener for whenever a block is clicked added
 		graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
 			public void mouseReleased(MouseEvent e) {
 				Object cell = graphComponent.getCellAt(e.getX(), e.getY());
@@ -566,12 +596,13 @@ public class Controller {
 
 			}
 		});
+		// hierarchial graph layout defined 
 		mxIGraphLayout layout = new mxHierarchicalLayout(graph);
 		layout.execute(graph.getDefaultParent());
-		graph.setCellsEditable(false);
+		graph.setCellsEditable(false); // nodes can't be modified 
 		graphComponent.setConnectable(false);
 
-		// scroll to the root cell
+		// scroll to the root cell whenever a control flow graph is loaded 
 		Object[] cells = graph.getChildVertices(graph.getDefaultParent());
 		for (Object c : cells) {
 			mxCell cell = (mxCell) c;
@@ -580,39 +611,43 @@ public class Controller {
 			}
 		}
 
+		// add a tab representing the selected function, representing an instance of a CFG
 		view.addTab(f.getName(), graphComponent);
-		initZoomListeners(graphComponent);
-		graphComponent.validate();
+		initZoomListeners(graphComponent); // zoom listeners added 
+		graphComponent.validate(); // update the graph by validating it
 
 	}
 
+	/**
+	 * Zoom in
+	 * @param graphComponent to zoom into
+	 */
 	private void zoomIn(mxGraphComponent graphComponent) {
 		graphComponent.zoomIn();
 		graphComponent.validate();
 	}
 
+	/**
+	 * Zoom out
+	 * @param graphComponent to zoom out of
+	 */
 	private void zoomOut(mxGraphComponent graphComponent) {
 		graphComponent.zoomOut();
 		graphComponent.validate();
 	}
 
-	public void scrollToVisibleInstruction(JTable table, int rowIndex) {
-		if (!(table.getParent() instanceof JViewport))
-			return;
-		JViewport viewport = (JViewport) table.getParent();
-		Rectangle rect = table.getCellRect(rowIndex, 0, true);
-		Point pt = viewport.getViewPosition();
-		rect.setLocation(rect.x - pt.x, rect.y - pt.y);
-		viewport.scrollRectToVisible(rect);
-		table.setRowSelectionInterval(rowIndex, rowIndex);
-	}
-
+	/**
+	 * scrolls to a block visible in the instruction table by taking into account the size of
+	 * the instruction table so that the process in dynamic
+	 * @param table to have a value in it scrolled to
+	 * @param rowIndex index of the row to scroll to
+	 * @param sizeOfBlock number of instructions selected
+	 */
 	public void scrollToVisibleInstructionBlock(JTable table, int rowIndex, int sizeOfBlock) {
 		if (!(table.getParent() instanceof JViewport))
 			return;
 		JViewport viewport = (JViewport) table.getParent();
-		// bottom of selection is 5 rows above bottom of scrollpane
-		// Rectangle rect = table.getCellRect(rowIndex, 0, true);
+	
 		Rectangle r = table.getCellRect(rowIndex, 0, true);
 		int extentHeight = viewport.getExtentSize().height;
 		int viewHeight = viewport.getViewSize().height;
@@ -621,9 +656,7 @@ public class Controller {
 		y = Math.min(y, viewHeight - extentHeight);
 
 		viewport.setViewPosition(new Point(0, y));
-		// Point pt = viewport.getViewPosition();
-		// rect.setLocation(rect.x - pt.x, rect.y - pt.y);
-		// viewport.scrollRectToVisible(rect);
+
 		table.setRowSelectionInterval(rowIndex, rowIndex + sizeOfBlock - 1);
 	}
 
