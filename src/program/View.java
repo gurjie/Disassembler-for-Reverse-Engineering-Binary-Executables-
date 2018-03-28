@@ -1,5 +1,8 @@
 package program;
 
+/**
+ * Main UI view, initialising components but not letting them know about eachother
+ */
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.FlowLayout;

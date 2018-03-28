@@ -7,6 +7,11 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
 
+/**
+ * Build a cell rendered for functions, so that functions not available to view for disassembly are displayed in red
+ * @author gurjan
+ *
+ */
 public class FunctionCellRenderer extends DefaultListCellRenderer {
 	private static ListCellRenderer<? super Function> getCellRenderer() {
 	    return new DefaultListCellRenderer(){

@@ -18,7 +18,6 @@ public class BasicBlock {
 	private ArrayList<String> ptrReferences = new ArrayList<String>();
 	private int startAddress;
 	private int endAddress;
-	private boolean isFunction;
 
 	/**
 	 * Create a new basic block, initialise its instruction block

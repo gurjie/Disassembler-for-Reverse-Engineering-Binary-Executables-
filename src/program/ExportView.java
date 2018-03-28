@@ -13,6 +13,11 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
+/**
+ * view for the export dialogue box which appears when export selected instruction is selected
+ * @author gurjan
+ *
+ */
 public class ExportView {
 	private JPanel panel;
 	private FlowLayout flowLayout;

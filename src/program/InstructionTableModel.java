@@ -8,6 +8,12 @@ import javax.swing.table.AbstractTableModel;
 
 import capstone.Capstone;
 
+/**
+ * Table model for the instruction able in the UI necessary for building the table
+ * each row loaded with function name, address, menmonic, and op string
+ * @author gurjan
+ *
+ */
 public class InstructionTableModel extends AbstractTableModel {
 
 	private static final String[] columnNames = { "Function", "Address", "Mnemonic", "Opstring" };
@@ -43,6 +49,7 @@ public class InstructionTableModel extends AbstractTableModel {
 		Capstone.CsInsn instruction = this.instructions.get(rowIndex);
 		switch (columnIndex) {
 		case 0:
+			// if the row entry's address can be associated with a function name, set it in the table
 			for (Function ff : this.functions) {
 				if (ff.getStartAddr() == instruction.address) {
 					return ff.getName();
@@ -54,6 +61,7 @@ public class InstructionTableModel extends AbstractTableModel {
 		case 2:
 			return instruction.mnemonic;
 		case 3:
+			// if the row entry's operand can be associated with a function name, set it in the table
 			int target = getTargetAddress(instruction);
 			if(target!=-1) {
 				for(Function ff:this.functions) {
@@ -71,6 +79,12 @@ public class InstructionTableModel extends AbstractTableModel {
 	public String getColumnName(int column) {
 		return this.columnNames[column];
 	}
+	
+	/**
+	 * can the operand of an instruction be resolved to an address?
+	 * @param instruction to be analyysed
+	 * @return address of target is successful,  -1 if not
+	 */
 	private int getTargetAddress(Capstone.CsInsn instruction) {
 		try {
 			long address = Long.decode(instruction.opStr.trim());

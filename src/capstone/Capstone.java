@@ -51,7 +51,7 @@ public class Capstone {
     public byte[] op_str;
     // detail information of instruction.
     public _cs_detail.ByReference cs_detail;
-
+    
     public _cs_insn() {
       bytes = new byte[16];
       mnemonic = new byte[32];
@@ -59,7 +59,7 @@ public class Capstone {
       java.util.Arrays.fill(mnemonic, (byte) 0);
       java.util.Arrays.fill(op_str, (byte) 0);
     }
-
+    
     public _cs_insn(Pointer p) {
       this();
       useMemory(p);

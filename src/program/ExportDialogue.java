@@ -19,6 +19,11 @@ import javax.swing.JOptionPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 
+/**
+ * Controller for the export dialogue that appears when right clicking the instruction table and selecting export
+ * @author gurjan
+ *
+ */
 public class ExportDialogue extends JDialog {
 	private Model model;
 	private ExportView view;
@@ -201,6 +206,12 @@ public class ExportDialogue extends JDialog {
 		});
 	}
 
+	/**
+	 * get selected strings' values
+	 * @param selectedRows rows current selected
+	 * @param id of the type of string to be formed
+	 * @return string representation of selected instruction
+	 */
 	public String buildSelectionString(int[] selectedRows, int id) {
 		String allSelected = "", row = "";
 		for (int x : selectedRows) {

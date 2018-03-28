@@ -66,7 +66,7 @@ public class Controller {
 	 * Builds the UI components by letting components know eachotehr that they exist
 	 * Layouts set and general parameters set
 	 */
-	public void initView() {
+	private void initView() {
 		view.getFrame().setJMenuBar(view.getMenuBar());
 		view.getMenuBar().add(view.getMenuFile());
 		view.getMenuFile().add(view.getFileMenuLoad());
@@ -115,7 +115,7 @@ public class Controller {
 	 * 
 	 * @return string path to the directory. "none selected" if no selection
 	 */
-	public String chooseDirectory() {
+	private String chooseDirectory() {
 		JFileChooser chooser = new JFileChooser();
 		chooser.setCurrentDirectory(new java.io.File("."));
 		chooser.setDialogTitle("Select Directory");
@@ -222,7 +222,7 @@ public class Controller {
 	 * Instantiate the dialogue box which appears whenever export is selected
 	 * such that it is invoked with the model view controller patter
 	 */
-	public void exportSelected() {
+	private void exportSelected() {
 		ExportView exportView = new ExportView();
 		ExportDialogue instance = new ExportDialogue(this.view.getFrame(), exportView, "Export", view.getInstTable(),
 				this.model);
@@ -238,7 +238,7 @@ public class Controller {
 	 * 			id can be COPY_FROM_FUNCT_NAME copies from name column in table onwards
 	 * 
 	 */
-	public void selectedInstructionsToClipboard(int id) {
+	private void selectedInstructionsToClipboard(int id) {
 		StringSelection selection = new StringSelection(
 				buildSelectionString(view.getInstTable().getSelectedRows(), id));
 		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -251,7 +251,7 @@ public class Controller {
 	 * @param id id of the selection type
 	 * @return a string representing the isntructions selected int he table 
 	 */
-	public String buildSelectionString(int[] selectedRows, int id) {
+	private String buildSelectionString(int[] selectedRows, int id) {
 		String allSelected = "", row = "";
 		for (int x : selectedRows) {
 			switch (id) {
@@ -283,7 +283,7 @@ public class Controller {
 	 * display the popup at (x,y) from view whenever right click selected 
 	 * @param e MouseEvent which could be a right click
 	 */
-	public void showPopup(MouseEvent e) {
+	private void showPopup(MouseEvent e) {
 		if (SwingUtilities.isRightMouseButton(e) == true) {
 			view.getPopup().show(e.getComponent(), e.getX(), e.getY());
 		}
@@ -294,7 +294,7 @@ public class Controller {
 	 * Initialises the instruction table, filling the table by setting the table model
 	 * Sets the row sorter so that table search can be implemented
 	 */
-	public void initInstTableModel() {
+	private void initInstTableModel() {
 		view.getModel().setModel(getInstructionList(), this.model.getFunctions(), this.model.getBasicBlocks());
 		view.getInstTable().setModel(view.getModel());
 		// Code adapted from Paul Samsotha answer to
@@ -337,10 +337,12 @@ public class Controller {
 	 */
 	public void initFunctionsListener() {
 		view.getFunctionList().addMouseListener(new MouseAdapter() {
+			// code adapted from Mohamed Saligh's response to the question at
+			// https://stackoverflow.com/questions/4344682/double-click-event-on-jlist-element
 			public void mouseClicked(MouseEvent evt) {
 				JList list = (JList) evt.getSource();
-				if (evt.getClickCount() == 2) {
-					int index = list.locationToIndex(evt.getPoint());
+				if (evt.getClickCount() == 2) { // if double click
+					int index = list.locationToIndex(evt.getPoint()); 
 					selectedFunction = view.getFunctionList().getSelectedValue();
 					if (selectedFunction.getStartAddr() == 0) {
 						JOptionPane.showMessageDialog(new JFrame(),
@@ -396,44 +398,15 @@ public class Controller {
 							+ "Functions discovered are basic blocks with no parents.", "Warning",
 							JOptionPane.WARNING_MESSAGE);
 				}
-				for (Function func : this.model.getFunctions()) {
-					view.getFunctionModel().addElement(func);
-					view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
 
-						@Override
-						public Component getListCellRendererComponent(JList list, Object value, int index,
-								boolean isSelected, boolean cellHasFocus) {
-							Component c = super.getListCellRendererComponent(list, value, index, isSelected,
-									cellHasFocus);
-							if (value instanceof Function) {
-								Function function = (Function) value;
-								setText(function.getName());
-								if (function.getStartAddr() == 0) {
-									setForeground(Color.RED);
-								} else {
-									setForeground(Color.BLUE);
-								}
-							} else {
-								// do nothing
-							}
-							return c;
-						}
-
-					});
-				}
-				for (Function f : this.model.getFunctions()) {
-					if (f.getStartAddr() - this.model.getVtf() == this.model.getMain()) {
-						this.selectedFunction = f;
-						showCFG(f);
-					}
-				}
+				setFunctionsCellRenderer();
+				displayInitialControlFlowGraph();
+				
 				initInstTableModel();
 				if (this.initialised == false) {
 					initFunctionsListener();
 				}
-				JOptionPane.showMessageDialog(new JFrame(),
-						"Disassembled " + this.model.getFile().getName() + " in " + this.model.getElapsed() + "ms",
-						"Disasm time", JOptionPane.INFORMATION_MESSAGE);
+	
 
 			} catch (ReadException e) {
 				JOptionPane.showMessageDialog(new JFrame(), e.getMessage(), "Exception", JOptionPane.ERROR_MESSAGE);
@@ -444,6 +417,46 @@ public class Controller {
 						JOptionPane.ERROR_MESSAGE);
 				e.printStackTrace();
 			}
+		}
+	}
+	
+	/**
+	 * displays the control flow graph upon loading a disassembly instance
+	 */
+	private void displayInitialControlFlowGraph() {
+		for (Function f : this.model.getFunctions()) {
+			if (f.getStartAddr() - this.model.getVtf() == this.model.getMain()) {
+				this.selectedFunction = f;
+				showCFG(f);
+			}
+		}
+	}
+	
+	private void setFunctionsCellRenderer() {
+		for (Function func : this.model.getFunctions()) {
+			view.getFunctionModel().addElement(func);
+			view.getFunctionList().setCellRenderer(new DefaultListCellRenderer() {
+
+				@Override
+				public Component getListCellRendererComponent(JList list, Object value, int index,
+						boolean isSelected, boolean cellHasFocus) {
+					Component c = super.getListCellRendererComponent(list, value, index, isSelected,
+							cellHasFocus);
+					if (value instanceof Function) {
+						Function function = (Function) value;
+						setText(function.getName());
+						if (function.getStartAddr() == 0) {
+							setForeground(Color.RED);
+						} else {
+							setForeground(Color.BLUE);
+						}
+					} else {
+						// do nothing
+					}
+					return c;
+				}
+
+			});
 		}
 	}
 
@@ -639,25 +652,21 @@ public class Controller {
 	/**
 	 * scrolls to a block visible in the instruction table by taking into account the size of
 	 * the instruction table so that the process in dynamic
-	 * @param table to have a value in it scrolled to
-	 * @param rowIndex index of the row to scroll to
+	 * @param instructionTable to have a value in it scrolled to
+	 * @param rowToScrollTo index of the row to scroll to
 	 * @param sizeOfBlock number of instructions selected
 	 */
-	public void scrollToVisibleInstructionBlock(JTable table, int rowIndex, int sizeOfBlock) {
-		if (!(table.getParent() instanceof JViewport))
+	private void scrollToVisibleInstructionBlock(JTable instructionTable, int rowToScrollTo, int sizeOfBlock) {
+		if (!(instructionTable.getParent() instanceof JViewport))
 			return;
-		JViewport viewport = (JViewport) table.getParent();
-	
-		Rectangle r = table.getCellRect(rowIndex, 0, true);
-		int extentHeight = viewport.getExtentSize().height;
-		int viewHeight = viewport.getViewSize().height;
-
-		int y = Math.max(0, r.y - ((extentHeight - r.height) / 2));
-		y = Math.min(y, viewHeight - extentHeight);
-
-		viewport.setViewPosition(new Point(0, y));
-
-		table.setRowSelectionInterval(rowIndex, rowIndex + sizeOfBlock - 1);
+		JViewport instTableViewport = (JViewport) instructionTable.getParent();
+		Rectangle rect = instructionTable.getCellRect(rowToScrollTo, 0, true);
+		int exth = instTableViewport.getExtentSize().height;
+		int currentViewH = instTableViewport.getViewSize().height;
+		int point = Math.max(0, rect.y - ((exth - rect.height) / 2));
+		point = Math.min(point, currentViewH - exth);
+		instTableViewport.setViewPosition(new Point(0, point));
+		instructionTable.setRowSelectionInterval(rowToScrollTo, rowToScrollTo + sizeOfBlock - 1);
 	}
 
 }

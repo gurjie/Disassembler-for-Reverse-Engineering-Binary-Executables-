@@ -4,5 +4,6 @@
 	<classpathentry kind="src" path=""/>
 	<classpathentry kind="lib" path="/home/gurjan/Downloads/jna-4.5.0.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/5"/>
+	<classpathentry kind="lib" path="/home/gurjan/Desktop/jgraphx-master/lib/jgraphx.jar"/>
 	<classpathentry kind="output" path=""/>
 </classpath>

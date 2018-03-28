@@ -21,6 +21,15 @@ import elf.SectionHeader;
 import elf.SectionType;
 import elf.SegmentType;
 
+/**
+ * Class responsible for performing disassembly. It is only invoked once in the model.
+ * Credit to the GNU Binutils library for assisting in determing the entry point and location 
+ * of ELF in the symbol table.
+ * The class can return information critical to displaying disassembled information in the GUI
+ * see Model for information on methods invoked in disassembled to do this. 
+ * @author gurjan
+ *
+ */
 public class Disassemble {
 	private Elf elf;
 	private int textStart;
@@ -45,11 +54,11 @@ public class Disassemble {
 	private int vtfAdjustment;
 	private int rip;
 	private long elapsed;
-	
+
 	public long getElapsed() {
 		return this.elapsed;
 	}
-	
+
 	public Disassemble(File f) throws ReadException, ElfException, MainDiscoveryException {
 		long time = System.currentTimeMillis();
 		try {
@@ -62,17 +71,16 @@ public class Disassemble {
 		} catch (IOException e) {
 			throw new ElfException(e.getMessage() + "\nPerhaps select an ELF 64 bit file");
 		}
-		// System.out.println(elf.header);
-		
+
 		this.vtfAdjustment = (int) elf.getProgramHeaderByType(SegmentType.LOAD).physicalAddress;
-		this.entry = (int) elf.header.entryPoint-vtfAdjustment;
+		this.entry = (int) elf.header.entryPoint - vtfAdjustment;
 		this.textStart = (int) getTextSection(elf).fileOffset;
 		this.textSize = (int) getTextSection(elf).size;
 		this.text_bytes = Arrays.copyOfRange(data, textStart, (int) (textStart + textSize));
 		this.cs = new Capstone(Capstone.CS_ARCH_X86, Capstone.CS_MODE_64);
 		setSections();
 		resolveSymbols(); // this only executes if function exists
-		buildConditionalCtis();
+		buildConditionals();
 		int main = setMain();
 		mainLoc = main;
 		this.blockList = new TreeMap<Integer, BasicBlock>();
@@ -84,33 +92,37 @@ public class Disassemble {
 				}
 			}
 			disasm(main);
-			
+
 		} else {
 			disasm(main);
 			assignParents();
 			resetCallTargetParents();
-			markFunctions(main);	
+			markFunctions(main);
 		}
 
 		Map<Integer, BasicBlock> splitBlockList = new TreeMap<Integer, BasicBlock>();
 		splitBlocks(splitBlockList);
 		updateSplitBlocks(splitBlockList);
 		addLoopReferences();
-		
+
+		// print all basic blocks to console
 		/*
-		Iterator<BasicBlock> itit = this.blockList.values().iterator();
-		while (itit.hasNext()) {
-			BasicBlock current = itit.next();
-			//System.out.println(current.instructionsToString());
-		}*/
+		 * Iterator<BasicBlock> itit = this.blockList.values().iterator(); while
+		 * (itit.hasNext()) { BasicBlock current = itit.next();
+		 * //System.out.println(current.instructionsToString()); }
+		 */
 
 		long endtime = System.currentTimeMillis();
-		long total = endtime-time;
+		long total = endtime - time;
 		this.elapsed = total;
 		System.out.println(total);
 	}
 
-	public void addLoopReferences() {
+	/**
+	 * For blocks that reference themselves, the control flow must know this so that
+	 * it can be displayed as such
+	 */
+	private void addLoopReferences() {
 		Iterator<BasicBlock> itr = this.blockList.values().iterator();
 		while (itr.hasNext()) {
 			BasicBlock current = itr.next();
@@ -128,42 +140,74 @@ public class Disassemble {
 			}
 		}
 	}
-	
-	public void updateSplitBlocks(Map<Integer,BasicBlock> splitBlockList) {
+
+	/**
+	 * Merge the values of the splitBlockList with the list of known blocks.
+	 * see @splitBlocks
+	 * 
+	 * @param splitBlockList
+	 *            to be integrated into main block list
+	 */
+	private void updateSplitBlocks(Map<Integer, BasicBlock> splitBlockList) {
 		Iterator<BasicBlock> splitBlockIt = splitBlockList.values().iterator();
 		while (splitBlockIt.hasNext()) {
 			BasicBlock current = splitBlockIt.next();
 			this.blockList.put(current.getFirstAddress(), current);
 		}
 	}
-	
-	public void splitBlocks(Map<Integer,BasicBlock> splitBlockList) {
+
+	/**
+	 * See Section 6.4 of project report for detailed analysis of why this function
+	 * is necessary, as well as an explanation. Split blocks which have an
+	 * instruction at some point that is not the beginning which is referenced by
+	 * another block ending in some jump type of instruction.
+	 * 
+	 * Splits the block into one block from {start of orginal block - mid block
+	 * instruction} and another from {instruction after original mid block
+	 * instruction - end of original block}
+	 * 
+	 * Updates all refrences accordingly.
+	 * 
+	 * @param splitBlockList
+	 *            to add the newly created blocks as a result to
+	 */
+	private void splitBlocks(Map<Integer, BasicBlock> splitBlockList) {
 		Iterator<BasicBlock> splitBlock2 = this.blockList.values().iterator();
 		while (splitBlock2.hasNext()) {
 			BasicBlock current = splitBlock2.next();
-			if(current.getBlockSize()!=0) {
-			if(current.getLastInstruction().mnemonic.equals("jmp")||isConditionalCti(current.getLastInstruction())) {
-				int target = getTargetAddress(current.getLastInstruction());
-				if(target!=-1) {
-					if(!this.blockList.containsKey(target)) {
-						Iterator<BasicBlock> targetIt = this.blockList.values().iterator();
+			if (current.getBlockSize() != 0) {
+				if (current.getLastInstruction().mnemonic.equals("jmp")
+						|| isConditionalCti(current.getLastInstruction())) {
+					int target = getTargetAddress(current.getLastInstruction());
+					if (target != -1) {
+						// if block found to end in jump type instruction and the blocklist
+						// doesnt contain the jump's target address the referenced instruction
+						// must be part the way through some other block
+						if (!this.blockList.containsKey(target)) {
+							Iterator<BasicBlock> targetIt = this.blockList.values().iterator();
+							// find the block containing the instruction
 							while (targetIt.hasNext()) {
 								BasicBlock tmp = targetIt.next();
 								if (tmp.getBlockSize() != 0) {
-									if (tmp.containsAddress(target)) {
+									if (tmp.containsAddress(target)) { // -----end find block containing isntruction
+										// get initial block references
 										HashSet<Integer> initialAddrReferences = new HashSet<Integer>();
 										HashSet<Integer> initialLoopReferences = new HashSet<Integer>();
 										initialLoopReferences.addAll(tmp.getLoopAddressReferences());
 										initialAddrReferences.addAll(tmp.getAddressReferenceList());
+										// original instructions from first to mid block target stored in temp list
 										ArrayList<Capstone.CsInsn> initialInsns = new ArrayList<Capstone.CsInsn>(
 												tmp.getInstructionList().subList(0, tmp.indexOfAddress(target)));
+										// original instructions after mid block target to end of block stored in list
 										ArrayList<Capstone.CsInsn> targetList = new ArrayList<Capstone.CsInsn>(
 												tmp.getInstructionList().subList(tmp.indexOfAddress(target),
 														tmp.getInstructionList().size()));
+										// block with the mist block target has its instruction list overwritten
+										// with its new instructions indexing from 0-midblock target
 										this.blockList.get(tmp.getFirstAddress()).overwriteInstructions(initialInsns,
 												(int) targetList.get(0).address);
-										BasicBlock jumpBlock = new BasicBlock(); // to hold instructions at and after
-																					// split
+										// new jumpblock holds instructions midblock-end of original block
+										BasicBlock jumpBlock = new BasicBlock();
 										jumpBlock.setInstructionList(targetList);
 										jumpBlock.setReferences(initialAddrReferences);
 										jumpBlock.setLoopReferences(initialLoopReferences);
@@ -178,52 +222,64 @@ public class Disassemble {
 			}
 		}
 	}
-	
-	
-	public void assignParents() {
+
+	/**
+	 * Give basic blocks parents by iterating every block's children and letting
+	 * them know that their parent is the block of the current iteration
+	 */
+	private void assignParents() {
 		Iterator<BasicBlock> blockItr = this.blockList.values().iterator();
 		// give blocks parents
 		while (blockItr.hasNext()) {
 			BasicBlock current = blockItr.next();
-				for(int children : current.getAddressReferenceList()) {
-					if(this.blockList.containsKey(children)) {
-						this.blockList.get(children).addParent(current.getFirstAddress());
-					} 
+			for (int children : current.getAddressReferenceList()) {
+				if (this.blockList.containsKey(children)) {
+					this.blockList.get(children).addParent(current.getFirstAddress());
 				}
-		}	
+			}
+		}
 	}
-	
-	public void resetCallTargetParents() {
+
+	/**
+	 * Give the target of all call instructions located in the text section no
+	 * parents so that they are treated as functions by markFunctions
+	 */
+	private void resetCallTargetParents() {
 		Iterator<BasicBlock> callToZero = this.blockList.values().iterator();
 		while (callToZero.hasNext()) {
 			BasicBlock current = callToZero.next();
-			if(current.getLastInstruction().mnemonic.equals("call")) {
-				//System.out.printf("0x%x:\t%s\t%s\n", current.getLastInstruction().address,
-						//current.getLastInstruction().mnemonic, current.getLastInstruction().opStr);
+			if (current.getLastInstruction().mnemonic.equals("call")) {
 				int callAddr = getTargetAddress(current.getLastInstruction());
-				if(callAddr!=-1) {
-					//System.out.print(current.instructionsToString());
-					//System.out.println(Long.toHexString(callAddr));
-					if(callAddr-this.vtfAdjustment >= textStart && callAddr-this.vtfAdjustment <= textStart + textSize) {
-						if(this.blockList.containsKey(callAddr)) {
+				if (callAddr != -1) {
+					if (callAddr - this.vtfAdjustment >= textStart
+							&& callAddr - this.vtfAdjustment <= textStart + textSize) {
+						if (this.blockList.containsKey(callAddr)) {
 							this.blockList.get(callAddr).getParents().clear();
 						}
 					}
 				}
 			}
-			
+
 		}
 	}
-	
-	public void markFunctions(int main) {
+
+	/**
+	 * Mark functions with no parents as functions. create a new Function and add it
+	 * to function list
+	 * 
+	 * @param main
+	 *            address as argument so that if a function beginning with this
+	 *            address is encountered it can be named 'main'
+	 */
+	private void markFunctions(int main) {
 		Iterator<BasicBlock> testItr = this.blockList.values().iterator();
 		while (testItr.hasNext()) {
 			BasicBlock current = testItr.next();
-			if(current.getParents().size()==0) {
-				for(Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
-					if(entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
+			if (current.getParents().size() == 0) {
+				for (Entry<Integer, BasicBlock> entry : this.blockList.tailMap(current.getFirstAddress()).entrySet()) {
+					if (entry.getValue().getLastInstruction().mnemonic.equals("ret")) {
 						Function ff;
-						if((current.getFirstAddress()-vtfAdjustment)==main) {
+						if ((current.getFirstAddress() - vtfAdjustment) == main) {
 							ff = new Function("main");
 						} else {
 							ff = new Function(Integer.toHexString(current.getFirstAddress()));
@@ -231,20 +287,28 @@ public class Disassemble {
 						ff.setStartAddr(current.getFirstAddress());
 						ff.setEndAddr(entry.getValue().getLastInstruction().address);
 						this.functions.add(ff);
-						//ff.setAssociatedAddresses(this.blockList);
 						break;
-					}	
+					}
 
 				}
 			}
 		}
 	}
-	
-	
+
+	/**
+	 * get the location of main entry point
+	 * 
+	 * @return address of main
+	 */
 	public int getMain() {
 		return this.mainLoc;
 	}
-	
+
+	/**
+	 * get all addresses visited by the disassembly procedure
+	 * 
+	 * @return hashset of addresses (each address is unique)
+	 */
 	public HashSet<Integer> getKnownAddresses() {
 		return this.knownAddresses;
 	}
@@ -269,10 +333,12 @@ public class Disassemble {
 		if (this.symtabExists && this.strtabExists) {
 			for (Function funct : functions) {
 				if (funct.getName().equals("main")) {
+					// main found easily from symbol table
 					return (int) funct.getStartAddr() - vtfAdjustment;
 				}
 			}
 		} else {
+			// try and discover the main for a stripped ELF
 			int discovered = discoverMain(entry, textSize, data);
 			if (discovered == -1) {
 				throw new MainDiscoveryException("Couldn't resolve main due to discovery heuristic failing!");
@@ -325,6 +391,8 @@ public class Disassemble {
 	 * - In the case that the current instruction is not a CTI or return, simply
 	 * disassemble at the next address.
 	 * 
+	 * definitely needs cleaning up
+	 * 
 	 * @param address
 	 *            to decode the instruction at
 	 * @return the current basic block of instructions
@@ -333,58 +401,53 @@ public class Disassemble {
 
 		BasicBlock current = new BasicBlock();
 		while (address < textStart + textSize) {
+			// if address has been visited return this block
 			if (this.knownAddresses.contains(address)) {
 				return current;
 			}
 			Capstone.CsInsn instruction;
 			instruction = disasmInstructionAtAddress(address, data, textStart, textSize);
-			current.addInstruction(instruction);
-			/*
-			if(current.getFirstAddress()==4205746) {
-				System.out.println(x);
-			}*/
-			/*
-			if (address == 4205752 - vtfAdjustment) {
-				System.out.println(current.getFirstAddress());
-				System.out.println("first instruction of cb8 is "+instruction.mnemonic);
-				System.out.println(current.getBlockSize());
-			}*/
-
+			current.addInstruction(instruction); // add this instruction to block-local instruction list
+			// return current block if instruction is return
 			if (instruction.mnemonic.equals("ret")) {
 				return current;
 			}
-
+			// if the instruction is a branch instruction perform the below logic
 			if (isConditionalCti(instruction) || isUnconditionalCti(instruction)) {
-				int jumpAddr = getTargetAddress(instruction) - vtfAdjustment;
-				if (jumpAddr != -1) {
+				int jumpAddr = getTargetAddress(instruction) - vtfAdjustment; // target of branch
+				if (jumpAddr != -1) { // if branch target is a numeric value
+					// if target is in text section and hasn't been cisited
 					if (jumpAddr >= textStart && jumpAddr <= textStart + textSize) {
 						if (!this.knownAddresses.contains(jumpAddr)) {
-							this.possibleTargets.add(jumpAddr);
-							if(!instruction.mnemonic.equals("call")) {
+							this.possibleTargets.add(jumpAddr); // add branch target to possible addresess
+							if (!instruction.mnemonic.equals("call")) { // only set target as child if its not a call
 								current.addAddressReference(jumpAddr + vtfAdjustment);
-							} 
-						} else if (this.knownAddresses.contains(jumpAddr) //IGNORE
+							}
+						} else if (this.knownAddresses.contains(jumpAddr) 
 								&& !this.blockList.containsKey(jumpAddr + vtfAdjustment)) {
-							if(!instruction.mnemonic.equals("call")) {
+							if (!instruction.mnemonic.equals("call")) {
 								current.addAddressReference(jumpAddr + vtfAdjustment);
 							}
 						} else {
-							if(!instruction.mnemonic.equals("call")) {
+							if (!instruction.mnemonic.equals("call")) { 
 								current.addAddressReference(jumpAddr + vtfAdjustment);
-							}						
+							}
 						}
 					} else {
+						// branch target is outside cope of text section
 						current.addAddressReferenceOutOfScope(jumpAddr);
 					}
 				}
 				int continueAddr = address + instruction.size;
+				// if current branch inst is not a jump target add the fallthrough address
+				// to the list of potential disasm targets
 				if (!instruction.mnemonic.equals("jmp")) {
 					this.possibleTargets.add(continueAddr);
 					current.addAddressReference(continueAddr + vtfAdjustment);
 				}
-				return current;
+				return current; // return the current block since this inst is a branch inst
 			} else {
-				address += instruction.size;
+				address += instruction.size; // if not a branch instruction, disassemble at next instruction
 			}
 		}
 		return current;
@@ -406,7 +469,7 @@ public class Disassemble {
 		for (SectionHeader shrs : this.elf.sectionHeaders) {
 			checkForSymtab(shrs);
 			checkForStrTab(shrs);
-			Section current = new Section(shrs.getName(),(int) shrs.virtualAddress);
+			Section current = new Section(shrs.getName(), (int) shrs.virtualAddress);
 			this.sections.add(current);
 		}
 	}
@@ -431,7 +494,7 @@ public class Disassemble {
 				this.symbolAddresses.add(current.getAddress()); // Addresses of any symbols added
 			}
 			for (SymbolEntry sym : this.symbolEntries) {
-				System.out.println(sym.getName()+"  "+sym.getAddress()+"  "+sym.getType());
+				System.out.println(sym.getName() + "  " + sym.getAddress() + "  " + sym.getType());
 				addFunctionFromSymtab(sym);
 			}
 		}
@@ -611,8 +674,9 @@ public class Disassemble {
 
 	/**
 	 * Adds control transfer instructions to a local list of cti instructions
+	 * it should be noted that the list contains all conditional cti instructions
 	 */
-	private void buildConditionalCtis() {
+	private void buildConditionals() {
 		this.conditionalCtis.add("ja");
 		this.conditionalCtis.add("jnbe");
 		this.conditionalCtis.add("jae");
@@ -655,99 +719,103 @@ public class Disassemble {
 	 * @param data:
 	 *            ELF file represented as a sequence of bytes
 	 * @return the address of the main function
-	 * @throws MainDiscoveryException  if heuristic completely failed
+	 * @throws MainDiscoveryException
+	 *             if heuristic completely failed
 	 */
 	private int discoverMain(int entry, int textSize, byte[] data) throws MainDiscoveryException {
 		ArrayList<Capstone.CsInsn> startInstructions = new ArrayList<Capstone.CsInsn>(); // list of instructions
-		
+
 		byte[] first_bytes = Arrays.copyOfRange(data, entry, entry + 15);
 		Capstone.CsInsn[] first = cs.disasm(first_bytes, entry, 1); // first instruction disassembled
 		Capstone.CsInsn instruction = first[0];
 		startInstructions.add(instruction);
 		int instSize = instruction.size;
-		while (!instruction.mnemonic.equals("hlt")) {
-			//System.out.println(Long.toHexString(instruction.address)+"\t"+instruction.mnemonic+"\t"+instruction.opStr);
-			this.rip = (int) (instruction.address+instruction.size);
-			//System.out.println(Integer.toHexString(rip));
-			// disassemble until hlt reached
-			first_bytes = Arrays.copyOfRange(data, entry+instSize, (int) (entry + 15+instSize));
+		// search the next hlt instruction from offset _start by performing a linear sweep
+		while (!instruction.mnemonic.equals("hlt")) { 
+			this.rip = (int) (instruction.address + instruction.size);
+			first_bytes = Arrays.copyOfRange(data, entry + instSize, (int) (entry + 15 + instSize));
 			Capstone.CsInsn[] allInsn = cs.disasm(first_bytes, entry + instSize, 1);
 			instruction = allInsn[0];
 			startInstructions.add(instruction);
 			instSize += instruction.size;
 		}
-		int index = startInstructions.size() - 1;
+		int index = startInstructions.size() - 1; // get index of hlt instruction
 		while (!startInstructions.get(index).mnemonic.equals("call")) {
-			index--;
+			index--; // work backwords until a call instruction has been found, said to be the call to libc_start_main
 		}
-		if (startInstructions.get(index).mnemonic.equals("call")) {
-			if (startInstructions.get(index - 1).mnemonic.equals("mov")||
-					startInstructions.get(index - 1).mnemonic.equals("lea")) {
+		if (startInstructions.get(index).mnemonic.equals("call")) { 
+			// if instruction loads some isntruction into a register, analyse its operands
+			if (startInstructions.get(index - 1).mnemonic.equals("mov")
+					|| startInstructions.get(index - 1).mnemonic.equals("lea")) {
 				String[] operands = startInstructions.get(index - 1).opStr.split(",");
 				for (String s : operands) {
+					// for operands, if it is a pure numeric, the address of main is taken to be this
 					if (resolveAddressFromString(s) != -1) {
 						return (int) resolveAddressFromString(s) - vtfAdjustment;
 					} else {
-						// couldnt resolve a clean address, so get the value in the register
+						// couldn't resolve a clean address, so get the value in the register
+						// matches for the registers with definitions below
 						if (s.matches(".di||.bp||.sp||.ep")) {
+							// analysis the next operant 
 							continue;
 						} else {
+							// if the address loaded is some arithmetic on the instruction point, determine the address
+							// deals with the instruction mov rdi, dword ptr [rip+someaddress]
+							// taking the value loaded into rdi as the address of main.
+							// must perform logic converting to an arthmetically interpretable string
 							if (s.contains("ip")) {
 								String out = s;
-								if (s.contains("[")) {
+								if (s.contains("[")) { 
 									out = s.substring(s.indexOf("[") + 1, s.indexOf("]"));
 								}
 								StringBuffer buf = new StringBuffer(out);
 								int start = firstIndex(buf.toString(), ".ip");
 								int end = start + 3;
-								buf.replace(start, end, Integer.toString(this.rip));
+								// determine the value of the instruction pointer and put it in an arithmetic string
+								// if some computation is performed on it
+								buf.replace(start, end, Integer.toString(this.rip));  
 								String halfway = buf.toString();
 								int hexStrlen = 0;
-						        if(halfway.contains("0x")) {
-						        	String[] tmp = halfway.split("\\s+");
-						        	for(String st : tmp) {
-						        		if(st.contains("0x")) {
-						        			hexStrlen = st.length();
-						        		}
-						        	}
-						        }
-						        String ii = halfway.substring(halfway.indexOf("0x"), halfway.indexOf("0x")+hexStrlen);
-						        long x = Long.decode(ii);
-						        int d = (int) x;
-						        StringBuffer buf2 = new StringBuffer(halfway);
-						        buf2.replace(halfway.indexOf("0x"), halfway.indexOf("0x")+hexStrlen, Integer.toString(d));
-						        return evaluteQuestion(buf2.toString());
-						        
+								if (halfway.contains("0x")) {
+									String[] tmp = halfway.split("\\s+");
+									for (String st : tmp) {
+										if (st.contains("0x")) {
+											hexStrlen = st.length();
+										}
+									}
+								}
+								
+								String ii = halfway.substring(halfway.indexOf("0x"), halfway.indexOf("0x") + hexStrlen);
+								long x = Long.decode(ii);
+								int d = (int) x;
+								StringBuffer buf2 = new StringBuffer(halfway);
+								buf2.replace(halfway.indexOf("0x"), halfway.indexOf("0x") + hexStrlen,
+										Integer.toString(d));
+								return evaluteQuestion(buf2.toString());
+
 							}
 							// if(out.contains(s))
 						}
-						
+
 					}
-				} 
-				
-				throw new MainDiscoveryException("Couldn't find main: expected address in register before call to libc_start_main");
+				}
+
+				throw new MainDiscoveryException(
+						"Couldn't find main: expected address in register before call to libc_start_main");
 			} else if (startInstructions.get(index - 1).mnemonic.equals("push")) {
+				// main address push onto stack directly, so main found
 				return (int) resolveAddressFromString(startInstructions.get(index - 1).opStr) - vtfAdjustment;
 			} else {
-				throw new MainDiscoveryException("Couldn't find main: expected moving of main address into register before libc_start_main called,"
-						+ "wasn't found at instruction proceeding call.");
+				throw new MainDiscoveryException(
+						"Couldn't find main: expected moving of main address into register before libc_start_main called,"
+								+ "wasn't found at instruction proceeding call.");
 			}
 		} else {
 			throw new MainDiscoveryException("Couldnt find main: expected call instruction before hlt in _start");
 		}
-	
+
 	}
 
-	// perform a single instruction linear sweep for testing purposes
-	/*
-	 * private void singleInstLinearSweep(int entry, int textSize, byte[] data,
-	 * Capstone cs, int start, int end, int address) { int InstSize = 0; while
-	 * (address < end&&address>start) { text_bytes = Arrays.copyOfRange(data,
-	 * address, (int) (address + textSize)); Capstone.CsInsn[] allInsn =
-	 * cs.disasm(text_bytes, entry + InstSize, 1); InstSize += allInsn[0].size;
-	 * System.out.printf("0x%x:\t%s\t%s\n", allInsn[0].address, allInsn[0].mnemonic,
-	 * allInsn[0].opStr); } }
-	 */
 
 	/**
 	 * Get the text section for the ELF passes as argument
@@ -765,72 +833,83 @@ public class Disassemble {
 		return elf.sectionHeaders[1];
 	}
 
-	
-	//find first index of some regex pattern in a string
-	public int firstIndex(String text, String regex) {
-	    Pattern pattern = Pattern.compile(regex);
-	    Matcher matcher = pattern.matcher(text);
-	    // Check all occurrences
-	    while (matcher.find()) {
-	    	return matcher.start();
-	    }
-	    return 0;
+	/**
+	 * Find the first index of some regex in a string
+	 * @param text string to be searched for regex
+	 * @param regex to be searched for 
+	 * @return index into string of substring matching regex
+	 */
+	private int firstIndex(String text, String regex) {
+		Pattern pattern = Pattern.compile(regex);
+		Matcher matcher = pattern.matcher(text);
+		// Check all occurrences
+		while (matcher.find()) {
+			return matcher.start();
+		}
+		return 0;
 	}
-	
-	public static int evaluteQuestion(String question){
-	    Scanner sc = new Scanner(question);
 
-	    // get the next number from the scanner
-	    int firstValue = Integer.parseInt(sc.findInLine("[0-9]*"));
+	/**
+	 * Evaluates an arithmetic string. credit to 
+	 * Lonely Neuron for answering question at 
+	 * https://stackoverflow.com/questions/35379705/how-to-convert-a-string-containing-math-expression-into-an-integer
+	 * @param question to be evaluated
+	 * @return integer result of arithmetic ocmputation
+	 */
+	private static int evaluteQuestion(String question) {
+		Scanner sc = new Scanner(question);
 
-	    // get everything which follows and is not a number (might contain white spaces)
-	    String operator = sc.findInLine("[^0-9]*").trim();
-	    int secondValue = Integer.parseInt(sc.findInLine("[0-9]*"));
-	    switch (operator){
-	        case "+":
-	            return firstValue + secondValue;
-	        case "-":
-	            return firstValue - secondValue;
-	        case "/":
-	            return firstValue / secondValue;
-	        case "*":
-	            return firstValue * secondValue;
-	        case "%":
-	            return firstValue % secondValue;
-	        // todo: add additional operators as needed..
-	        default:
-	            throw new RuntimeException("unknown operator: "+operator);
-	    }
+		// get the next number from the scanner
+		int firstValue = Integer.parseInt(sc.findInLine("[0-9]*"));
+
+		// get everything which follows and is not a number (might contain white spaces)
+		String operator = sc.findInLine("[^0-9]*").trim();
+		int secondValue = Integer.parseInt(sc.findInLine("[0-9]*"));
+		switch (operator) {
+		case "+":
+			return firstValue + secondValue;
+		case "-":
+			return firstValue - secondValue;
+		case "/":
+			return firstValue / secondValue;
+		case "*":
+			return firstValue * secondValue;
+		case "%":
+			return firstValue % secondValue;
+		// todo: add additional operators as needed..
+		default:
+			throw new RuntimeException("unknown operator: " + operator);
+		}
 	}
-	
+
 	public String getHexRepresentation(int startAddr, int endAddr, boolean spaces) {
-		byte[] slice = Arrays.copyOfRange(data, startAddr, endAddr+1);
+		byte[] slice = Arrays.copyOfRange(data, startAddr, endAddr + 1);
 		String hexString = "";
-		if (spaces==true) {
+		if (spaces == true) {
 			hexString = array2hex(slice, true);
 		} else {
 			hexString = array2hex(slice, false);
 		}
 		return hexString;
 	}
-    
-    private static String array2hex(byte[] arr, boolean spaces) {
-        String ret = "";
-        for (int i=0;i<arr.length; i++) {
-        	if(spaces==true) {
-        		ret += String.format("%02x ", arr[i]);
-        	} else {
-        		ret += String.format("%02x", arr[i]);
-        	}
-        	if(i%29==0&&i!=0) {
-        		ret = ret.concat("\n");
-        	}
-        }
-        return ret;
-    }
-    
-    public int getVtf() {
-    	return this.vtfAdjustment;
-    }
+
+	private static String array2hex(byte[] arr, boolean spaces) {
+		String ret = "";
+		for (int i = 0; i < arr.length; i++) {
+			if (spaces == true) {
+				ret += String.format("%02x ", arr[i]);
+			} else {
+				ret += String.format("%02x", arr[i]);
+			}
+			if (i % 29 == 0 && i != 0) {
+				ret = ret.concat("\n");
+			}
+		}
+		return ret;
+	}
+
+	public int getVtf() {
+		return this.vtfAdjustment;
+	}
 
 }

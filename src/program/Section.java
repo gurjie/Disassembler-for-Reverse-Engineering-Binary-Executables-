@@ -1,5 +1,10 @@
 package program;
 
+/**
+ * 
+ * @author gurjan
+ *
+ */
 public class Section {
 	
 	private String sectionName;
