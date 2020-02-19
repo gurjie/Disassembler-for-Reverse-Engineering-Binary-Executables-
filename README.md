@@ -6,3 +6,8 @@ Nothing else is really worth taking a dig around - mostly artifcats from POC pro
 
 
 It's messy because uni-me decided to switch from svn to git halfway through :)
+
+Side by side with IDA:
+
+![Side by side with IDA](/Capture.PNG)
+
