@@ -1,4 +1,4 @@
-# 3yp
+# disassembler for reverse engineering binary executables
 ~/src -> program for the source code
 ~/Final year project report .pdf for the final report, approx 15k words
 
