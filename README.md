@@ -11,3 +11,5 @@ Side by side with IDA:
 
 ![Side by side with IDA](/Capture.PNG)
 
+![Standalone](/Capture2.PNG)
+
