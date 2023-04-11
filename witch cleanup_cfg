@@ -1,0 +1,12 @@
+* [7;33mmaster                             [m af96d37 Add files via upload
+  [32mremotes/origin/HEAD                [m -> origin/master
+  [32mremotes/origin/Instruction_table   [m cfdfcdf Big bugfix related to CFG. INstruciton table jumps to selected instruction in cfg too.
+  [32mremotes/origin/cfg                 [m fccede6 cfg module of gui is ready to be loaded with actual data. begin disassembly
+  [32mremotes/origin/cleanup_cfg         [m 175ca5c Comments added, various code fixes, cleanup: final commit to branch
+  [32mremotes/origin/export              [m 4078634 export sorted. fixes to additional corner cases also applied...
+  [32mremotes/origin/function_identify   [m e52885d large scale changes, restructured repo, export functionality, function discovery
+  [32mremotes/origin/master              [m af96d37 Add files via upload
+  [32mremotes/origin/recursive_disasm    [m e590620 Great progress, CFG now shows for functions. just needs cleaning up
+  [32mremotes/origin/relocs              [m 2364107 final commit
+  [32mremotes/origin/stripped_disassembly[m 006e0e3 Stripped ELFs can now be disassembled in some instances, the heuristic is not solid for discovering main but works with binaries compiled on this laptop
+  [32mremotes/origin/tabbed_CFG          [m 6c51355 CFG now shown in tabs related to functions :)
